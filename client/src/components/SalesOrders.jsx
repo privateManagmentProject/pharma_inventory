@@ -34,7 +34,7 @@ const SalesOrders = () => {
       if (productSearch) params.append("productName", productSearch);
 
       const response = await axios.get(
-        `http://localhost:5000/api/sales-order?${params}`,
+        `https://inventory-backend-ajj1.onrender.com/api/sales-order?${params}`,
         {
           headers: {
             Authorization: `Bearer ${localStorage.getItem("pos-token")}`,
@@ -52,11 +52,14 @@ const SalesOrders = () => {
 
   const fetchProducts = async () => {
     try {
-      const response = await axios.get("http://localhost:5000/api/product", {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("pos-token")}`,
-        },
-      });
+      const response = await axios.get(
+        "https://inventory-backend-ajj1.onrender.com/api/product",
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("pos-token")}`,
+          },
+        }
+      );
 
       setProducts(response.data.products);
     } catch (error) {
@@ -73,7 +76,7 @@ const SalesOrders = () => {
     e.preventDefault();
     try {
       const response = await axios.post(
-        "http://localhost:5000/api/sales-order/add",
+        "https://inventory-backend-ajj1.onrender.com/api/sales-order/add",
         formData,
         {
           headers: {
@@ -108,7 +111,7 @@ const SalesOrders = () => {
   const handleStatusUpdate = async (id, status) => {
     try {
       const response = await axios.put(
-        `http://localhost:5000/api/sales-order/${id}/status`,
+        `https://inventory-backend-ajj1.onrender.com/api/sales-order/${id}/status`,
         { status },
         {
           headers: {

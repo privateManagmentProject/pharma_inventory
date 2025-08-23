@@ -13,11 +13,14 @@ const Categories = () => {
   const fetchCategory = async () => {
     setLoading(true);
     try {
-      const response = await axios.get("http://localhost:5000/api/category", {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("pos-token")}`,
-        },
-      });
+      const response = await axios.get(
+        "https://inventory-backend-ajj1.onrender.com/api/category",
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("pos-token")}`,
+          },
+        }
+      );
       setCategories(response.data.categories);
       setLoading(false);
     } catch (error) {
@@ -34,8 +37,8 @@ const Categories = () => {
     e.preventDefault();
     try {
       const url = editCategory
-        ? `http://localhost:5000/api/category/${editCategory}`
-        : "http://localhost:5000/api/category/add";
+        ? `https://inventory-backend-ajj1.onrender.com/api/category/${editCategory}`
+        : "https://inventory-backend-ajj1.onrender.com/api/category/add";
 
       const method = editCategory ? "put" : "post";
 
@@ -79,7 +82,7 @@ const Categories = () => {
     if (window.confirm("Are you sure you want to delete this category?")) {
       try {
         const response = await axios.delete(
-          `http://localhost:5000/api/category/${id}`,
+          `https://inventory-backend-ajj1.onrender.com/api/category/${id}`,
           {
             headers: {
               Authorization: `Bearer ${localStorage.getItem("pos-token")}`,

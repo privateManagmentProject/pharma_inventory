@@ -43,7 +43,7 @@ const Products = () => {
       if (supplierFilter) params.append("supplier", supplierFilter);
 
       const response = await axios.get(
-        `http://localhost:5000/api/product?${params}`,
+        `https://inventory-backend-ajj1.onrender.com/api/product?${params}`,
         {
           headers: {
             Authorization: `Bearer ${localStorage.getItem("pos-token")}`,
@@ -69,8 +69,8 @@ const Products = () => {
     e.preventDefault();
     try {
       const url = editProduct
-        ? `http://localhost:5000/api/product/${editProduct._id}`
-        : "http://localhost:5000/api/product/add";
+        ? `https://inventory-backend-ajj1.onrender.com/api/product/${editProduct._id}`
+        : "https://inventory-backend-ajj1.onrender.com/api/product/add";
 
       const method = editProduct ? "put" : "post";
 
@@ -134,7 +134,7 @@ const Products = () => {
     if (window.confirm("Are you sure you want to delete this product?")) {
       try {
         const response = await axios.delete(
-          `http://localhost:5000/api/product/${id}`,
+          `https://inventory-backend-ajj1.onrender.com/api/product/${id}`,
           {
             headers: {
               Authorization: `Bearer ${localStorage.getItem("pos-token")}`,

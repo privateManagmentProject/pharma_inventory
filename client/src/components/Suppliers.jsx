@@ -39,12 +39,15 @@ const Suppliers = () => {
   const fetchSupplier = async () => {
     setLoading(true);
     try {
-      const response = await axios.get("http://localhost:5000/api/supplier", {
-        headers: {
-          // "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("pos-token")}`,
-        },
-      });
+      const response = await axios.get(
+        "https://inventory-backend-ajj1.onrender.com/api/supplier",
+        {
+          headers: {
+            // "Content-Type": "application/json",
+            Authorization: `Bearer ${localStorage.getItem("pos-token")}`,
+          },
+        }
+      );
       setSuppliers(response.data.supplier);
       console.log(response.data.suppl);
       setLoading(false);
@@ -62,7 +65,7 @@ const Suppliers = () => {
     e.preventDefault();
     try {
       const response = await axios.post(
-        "http://localhost:5000/api/supplier/add",
+        "https://inventory-backend-ajj1.onrender.com/api/supplier/add",
         formData,
         {
           headers: {
@@ -90,7 +93,7 @@ const Suppliers = () => {
 
   //   const fetchCategory = async () => {
   //     try {
-  //       const response = await axios.get("http://localhost:5000/api/category", {
+  //       const response = await axios.get("https://inventory-backend-ajj1.onrender.com/api/category", {
   //         headers: {
   //           // "Content-Type": "application/json",
   //           Authorization: `Bearer ${localStorage.getItem("pos-token")}`,
