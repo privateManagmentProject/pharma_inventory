@@ -8,7 +8,11 @@ import mongoose from "mongoose";
     supplierPrice: { type: String, required: true },
     expiryDate: { type: Date, required: true},
     stock :{ type: String, required: true },
-    packageSize :{ type: String, required: true },
+   packageSize: { 
+  type: String, 
+  required: true,
+  enum: ['kg', 'box', 'bottle', 'pack', 'unit'] // Add your desired package types
+},
     categoryId: {type: mongoose.Schema.Types.ObjectId, ref: "Category", require: true},
     supplierId: {type: mongoose.Schema.Types.ObjectId, ref: "Supplier", require: true}
    

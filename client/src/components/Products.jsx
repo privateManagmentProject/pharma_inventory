@@ -356,15 +356,20 @@ const Products = () => {
                 </div>
                 <div className="flex flex-col gap-1">
                   <label className="font-medium">Package Size</label>
-                  <input
-                    type="text"
+                  <select
                     name="packageSize"
-                    placeholder="Package Size"
                     value={formData.packageSize}
                     onChange={handleChange}
                     className="border p-2 rounded"
                     required
-                  />
+                  >
+                    <option value="">Select Package Size</option>
+                    <option value="kg">kg</option>
+                    <option value="box">box</option>
+                    <option value="bottle">bottle</option>
+                    <option value="pack">pack</option>
+                    <option value="unit">unit</option>
+                  </select>
                 </div>
                 <div className="flex flex-col gap-1">
                   <label className="font-medium">Category</label>
