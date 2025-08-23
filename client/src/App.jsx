@@ -1,12 +1,13 @@
 import { Route, BrowserRouter as Router, Routes } from "react-router";
 import "./App.css";
-import Categories from "./components/Categories";
-import Products from "./components/Products";
 import Root from "./components/Root";
-import SalesOrders from "./components/SalesOrders";
-import Suppliers from "./components/Suppliers";
+import Categories from "./pages/Categories";
+import Customers from "./pages/Customers";
 import Dashbaord from "./pages/Dashbaord";
 import Login from "./pages/Login";
+import Products from "./pages/Products";
+import SalesOrders from "./pages/SalesOrders";
+import Suppliers from "./pages/Suppliers";
 import ProtectedRoutes from "./utils/ProtectedRoutes";
 function App() {
   return (
@@ -26,6 +27,7 @@ function App() {
           <Route path="suppliers" element={<Suppliers />} />
           <Route path="products" element={<Products />} />
           <Route path="salesOrders" element={<SalesOrders />} />
+          <Route path="customers" element={<Customers />} />
         </Route>
         <Route
           path="/customer/dashboard"

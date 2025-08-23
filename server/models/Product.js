@@ -8,6 +8,7 @@ import mongoose from "mongoose";
     supplierPrice: { type: String, required: true },
     expiryDate: { type: Date, required: true},
     stock :{ type: String, required: true },
+     image: { type: String },
    packageSize: { 
   type: String, 
   required: true,

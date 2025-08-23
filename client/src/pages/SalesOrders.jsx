@@ -1,7 +1,8 @@
 import axios from "axios";
 import jsPDF from "jspdf";
 import React, { useEffect, useState } from "react";
-import DataTable from "./DataTable";
+import DataTable from "../components/DataTable";
+import FormField from "../components/FormField";
 
 const SalesOrders = () => {
   const [addModal, setAddModal] = useState(false);
@@ -384,6 +385,30 @@ const SalesOrders = () => {
     },
   ];
 
+  const productOptions = [
+    { value: "", label: "Select Product" },
+    ...products.map((product) => ({
+      value: product._id,
+      label: `${product.name} - Stock: ${product.stock} ${product.packageSize} - $${product.price}`,
+    })),
+  ];
+
+  const packageSizeOptions = [
+    { value: "", label: "Select Package Size" },
+    { value: "kg", label: "kg" },
+    { value: "box", label: "box" },
+    { value: "bottle", label: "bottle" },
+    { value: "pack", label: "pack" },
+    { value: "unit", label: "unit" },
+  ];
+
+  const statusOptions = [
+    { value: "pending", label: "Pending" },
+    { value: "progress", label: "Payment in Progress" },
+    { value: "approved", label: "Approved" },
+    { value: "rejected", label: "Rejected" },
+  ];
+
   return (
     <div className="w-full h-full flex flex-col gap-4 p-4">
       <h1 className="text-2xl font-bold">Sales Orders Management</h1>
@@ -433,246 +458,199 @@ const SalesOrders = () => {
 
       {addModal && (
         <div className="fixed top-0 left-0 w-full h-full bg-black/50 flex justify-center items-center p-4">
-          <div className="bg-white p-4 rounded shadow-md w-full max-w-md relative">
-            <h1 className="text-xl font-bold">Create Sales Order</h1>
-            <button
-              className="absolute top-4 right-4 font-bold text-lg cursor-pointer"
-              onClick={() => {
-                setAddModal(false);
-                setFormData({
-                  productId: "",
-                  quantity: "",
-                  packageSize: "",
-                  salesPrice: "",
-                  paidAmount: "0",
-                  customerName: "",
-                });
-              }}
-            >
-              X
-            </button>
-            <form className="flex flex-col gap-4 mt-4" onSubmit={handleSubmit}>
-              <div className="flex flex-col gap-1">
-                <label className="font-medium">Product</label>
-                <select
-                  name="productId"
-                  value={formData.productId}
-                  onChange={handleProductChange}
-                  className="border p-2 rounded"
-                  required
-                >
-                  <option value="">Select Product</option>
-                  {products.map((product) => (
-                    <option key={product._id} value={product._id}>
-                      {product.name} - Stock: {product.stock}{" "}
-                      {product.packageSize} - ${product.price}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="flex flex-col gap-1">
-                <label className="font-medium">Customer Name</label>
-                <input
-                  type="text"
-                  name="customerName"
-                  placeholder="Customer Name"
-                  value={formData.customerName}
-                  onChange={handleChange}
-                  className="border p-2 rounded"
-                  required
-                />
-              </div>
-              <div className="flex flex-col gap-1">
-                <label className="font-medium">Package Size</label>
-                <select
-                  name="packageSize"
-                  value={formData.packageSize}
-                  onChange={handleChange}
-                  className="border p-2 rounded"
-                  required
-                >
-                  <option value="">Select Package Size</option>
-                  <option value="kg">kg</option>
-                  <option value="box">box</option>
-                  <option value="bottle">bottle</option>
-                  <option value="pack">pack</option>
-                  <option value="unit">unit</option>
-                </select>
-              </div>
-              <div className="flex flex-col gap-1">
-                <label className="font-medium">Quantity</label>
-                <input
-                  type="number"
-                  name="quantity"
-                  placeholder="Quantity"
-                  value={formData.quantity}
-                  onChange={handleQuantityChange}
-                  className="border p-2 rounded"
-                  required
-                />
-              </div>
-              <div className="flex flex-col gap-1">
-                <label className="font-medium">Total Price</label>
-                <input
-                  type="text"
-                  name="salesPrice"
-                  value={`$${formData.salesPrice}`}
-                  className="border p-2 rounded bg-gray-100"
-                  readOnly
-                />
-              </div>
-              <div className="flex flex-col gap-1">
-                <label className="font-medium">Paid Amount</label>
-                <input
-                  type="number"
-                  name="paidAmount"
-                  placeholder="Paid Amount"
-                  value={formData.paidAmount}
-                  onChange={handleChange}
-                  className="border p-2 rounded"
-                />
-              </div>
+          <div className="bg-white border-4 rounded-lg shadow relative w-full max-w-md max-h-screen overflow-y-auto">
+            <div className="flex items-start justify-between p-5 border-b rounded-t">
+              <h3 className="text-xl font-semibold">Create Sales Order</h3>
               <button
-                type="submit"
-                className="px-4 py-2 bg-blue-500 text-white rounded cursor-pointer mt-4"
+                type="button"
+                className="text-gray-400 bg-transparent hover:bg-gray-200 hover:text-gray-900 rounded-lg text-sm p-1.5 ml-auto inline-flex items-center"
+                onClick={() => {
+                  setAddModal(false);
+                  setFormData({
+                    productId: "",
+                    quantity: "",
+                    packageSize: "",
+                    salesPrice: "",
+                    paidAmount: "0",
+                    customerName: "",
+                  });
+                }}
               >
-                Create Order
+                <svg
+                  className="w-5 h-5"
+                  fill="currentColor"
+                  viewBox="0 0 20 20"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    fillRule="evenodd"
+                    d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
+                    clipRule="evenodd"
+                  ></path>
+                </svg>
               </button>
-            </form>
+            </div>
+            <div className="p-6 space-y-6">
+              <form onSubmit={handleSubmit}>
+                <div className="grid grid-cols-6 gap-6">
+                  <FormField
+                    label="Product"
+                    name="productId"
+                    type="select"
+                    value={formData.productId}
+                    onChange={handleProductChange}
+                    options={productOptions}
+                    required
+                  />
+                  <FormField
+                    label="Customer Name"
+                    name="customerName"
+                    value={formData.customerName}
+                    onChange={handleChange}
+                    placeholder="Customer Name"
+                    required
+                  />
+                  <FormField
+                    label="Package Size"
+                    name="packageSize"
+                    type="select"
+                    value={formData.packageSize}
+                    onChange={handleChange}
+                    options={packageSizeOptions}
+                    required
+                  />
+                  <FormField
+                    label="Quantity"
+                    name="quantity"
+                    type="number"
+                    value={formData.quantity}
+                    onChange={handleQuantityChange}
+                    placeholder="Quantity"
+                    required
+                  />
+                  <FormField
+                    label="Total Price"
+                    name="salesPrice"
+                    value={`$${formData.salesPrice}`}
+                    className="bg-gray-100"
+                    readOnly
+                  />
+                  <FormField
+                    label="Paid Amount"
+                    name="paidAmount"
+                    type="number"
+                    value={formData.paidAmount}
+                    onChange={handleChange}
+                    placeholder="Paid Amount"
+                    step="0.01"
+                  />
+                </div>
+                <div className="p-6 border-t border-gray-200 rounded-b">
+                  <button
+                    type="submit"
+                    className="text-white bg-cyan-600 hover:bg-cyan-700 focus:ring-4 focus:ring-cyan-200 font-medium rounded-lg text-sm px-5 py-2.5 text-center"
+                  >
+                    Create Order
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
         </div>
       )}
 
       {editModal && (
         <div className="fixed top-0 left-0 w-full h-full bg-black/50 flex justify-center items-center p-4">
-          <div className="bg-white p-4 rounded shadow-md w-full max-w-md relative">
-            <h1 className="text-xl font-bold">Update Payment</h1>
-            <button
-              className="absolute top-4 right-4 font-bold text-lg cursor-pointer"
-              onClick={() => setEditModal(false)}
-            >
-              X
-            </button>
-            <form
-              className="flex flex-col gap-4 mt-4"
-              onSubmit={handleEditSubmit}
-            >
-              <div className="flex flex-col gap-1">
-                <label className="font-medium">Package Size</label>
-                <select
-                  name="packageSize"
-                  value={editFormData.packageSize}
-                  onChange={handleChange}
-                  className="border p-2 rounded"
-                  required
-                >
-                  <option value="">Select Package Size</option>
-                  <option value="kg">kg</option>
-                  <option value="box">box</option>
-                  <option value="bottle">bottle</option>
-                  <option value="pack">pack</option>
-                  <option value="unit">unit</option>
-                </select>
-              </div>
-              {/* <div className="flex flex-col gap-1">
-                <label className="font-medium">Product</label>
-                <select
-                  name="productId"
-                  value={editFormData.productId}
-                  onChange={handleProductChange}
-                  className="border p-2 rounded"
-                  required
-                >
-                  <option value="">Select Product</option>
-                  {products.map((product) => (
-                    <option key={product._id} value={product._id}>
-                      {product.name} - Stock: {product.stock}{" "}
-                      {product.packageSize} - ${product.price}
-                    </option>
-                  ))}
-                </select>
-              </div> */}
-              <div className="flex flex-col gap-1">
-                <label className="font-medium">Customer Name</label>
-                <input
-                  type="text"
-                  name="productId"
-                  placeholder="Customer Name"
-                  value={editFormData.productId}
-                  onChange={handleChange}
-                  className="border p-2 rounded"
-                  required
-                />
-              </div>
-              <div className="flex flex-col gap-1">
-                <label className="font-medium">Customer Name</label>
-                <input
-                  type="text"
-                  name="customerName"
-                  placeholder="Customer Name"
-                  value={editFormData.customerName}
-                  onChange={handleChange}
-                  className="border p-2 rounded"
-                  required
-                />
-              </div>
-              <div className="flex flex-col gap-1">
-                <label className="font-medium">Total Price</label>
-                <input
-                  type="text"
-                  name="salesPrice"
-                  value={`$${editFormData.salesPrice}`}
-                  className="border p-2 rounded bg-gray-100"
-                  readOnly
-                />
-              </div>
-              <div className="flex flex-col gap-1">
-                <label className="font-medium">Paid Amount</label>
-                <input
-                  type="number"
-                  name="paidAmount"
-                  placeholder="Paid Amount"
-                  value={editFormData.paidAmount}
-                  onChange={handleEditChange}
-                  className="border p-2 rounded"
-                  max={editFormData.salesPrice}
-                  step="0.01"
-                />
-              </div>
-              <div className="flex flex-col gap-1">
-                <label className="font-medium">Status</label>
-                <select
-                  name="status"
-                  value={editFormData.status}
-                  onChange={handleEditChange}
-                  className="border p-2 rounded"
-                >
-                  <option value="pending">Pending</option>
-                  <option value="progress">Payment in Progress</option>
-                  <option value="approved">Approved</option>
-                  <option value="rejected">Rejected</option>
-                </select>
-              </div>
-              <div className="bg-gray-100 p-3 rounded">
-                <p className="text-sm">
-                  Balance: $
-                  {(
-                    parseFloat(editFormData.salesPrice) -
-                    parseFloat(editFormData.paidAmount || 0)
-                  ).toFixed(2)}
-                </p>
-                <p className="text-sm">
-                  Note: Setting paid amount to full price will automatically
-                  change status to Approved
-                </p>
-              </div>
+          <div className="bg-white border-4 rounded-lg shadow relative w-full max-w-md max-h-screen overflow-y-auto">
+            <div className="flex items-start justify-between p-5 border-b rounded-t">
+              <h3 className="text-xl font-semibold">Update Payment</h3>
               <button
-                type="submit"
-                className="px-4 py-2 bg-blue-500 text-white rounded cursor-pointer mt-4"
+                type="button"
+                className="text-gray-400 bg-transparent hover:bg-gray-200 hover:text-gray-900 rounded-lg text-sm p-1.5 ml-auto inline-flex items-center"
+                onClick={() => setEditModal(false)}
               >
-                Update Payment
+                <svg
+                  className="w-5 h-5"
+                  fill="currentColor"
+                  viewBox="0 0 20 20"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    fillRule="evenodd"
+                    d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
+                    clipRule="evenodd"
+                  ></path>
+                </svg>
               </button>
-            </form>
+            </div>
+            <div className="p-6 space-y-6">
+              <form onSubmit={handleEditSubmit}>
+                <div className="grid grid-cols-6 gap-6">
+                  <FormField
+                    label="Package Size"
+                    name="packageSize"
+                    type="select"
+                    value={editFormData.packageSize}
+                    onChange={handleEditChange}
+                    options={packageSizeOptions}
+                    required
+                  />
+                  <FormField
+                    label="Customer Name"
+                    name="customerName"
+                    value={editFormData.customerName}
+                    onChange={handleEditChange}
+                    placeholder="Customer Name"
+                    required
+                  />
+                  <FormField
+                    label="Total Price"
+                    name="salesPrice"
+                    value={`$${editFormData.salesPrice}`}
+                    readOnly
+                  />
+                  <FormField
+                    label="Paid Amount"
+                    name="paidAmount"
+                    type="number"
+                    value={editFormData.paidAmount}
+                    onChange={handleEditChange}
+                    placeholder="Paid Amount"
+                    step="0.01"
+                    max={editFormData.salesPrice}
+                  />
+                  <FormField
+                    label="Status"
+                    name="status"
+                    type="select"
+                    value={editFormData.status}
+                    onChange={handleEditChange}
+                    options={statusOptions}
+                  />
+                </div>
+                <div className="bg-gray-100 p-3 rounded">
+                  <p className="text-sm">
+                    Balance: $
+                    {(
+                      parseFloat(editFormData.salesPrice) -
+                      parseFloat(editFormData.paidAmount || 0)
+                    ).toFixed(2)}
+                  </p>
+                  <p className="text-sm">
+                    Note: Setting paid amount to full price will automatically
+                    change status to Approved
+                  </p>
+                </div>
+                <div className="p-6 border-t border-gray-200 rounded-b">
+                  <button
+                    type="submit"
+                    className="text-white bg-cyan-600 hover:bg-cyan-700 focus:ring-4 focus:ring-cyan-200 font-medium rounded-lg text-sm px-5 py-2.5 text-center"
+                  >
+                    Update Payment
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
         </div>
       )}

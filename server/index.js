@@ -4,6 +4,7 @@ import express from 'express';
 import connectDB from './db/connection.js';
 import authRoutes from './routes/auth.js';
 import categoryRoutes from './routes/category.js';
+import customerRoutes from "./routes/customer.js";
 import productRoutes from "./routes/product.js";
 import SalesOrderRoutes from "./routes/salesOrder.js";
 import supplierRoutes from "./routes/supplier.js";
@@ -16,6 +17,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/category', categoryRoutes);
 app.use('/api/supplier', supplierRoutes);
 app.use('/api/product', productRoutes)
+app.use('/api/customer', customerRoutes)
 app.use('/api/sales-order', SalesOrderRoutes)
 app.listen(process.env.PORT || 5000, () => {
     connectDB();

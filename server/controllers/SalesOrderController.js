@@ -201,10 +201,24 @@ const updateSalesOrderStatus = async (req, res) => {
         return res.status(500).json({ success: false, message: "Server error" });
     }
 };
+const getSalesOrderById = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const salesOrder = await SalesOrderModal.findById(id)
+      .populate('productId');
+    
+    if (!salesOrder) {
+      return res.status(404).json({ success: false, message: "Sales order not found" });
+    }
+    
+    return res.status(200).json({ success: true, salesOrder });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: "Server error" });
+  }
+};
 
 
 
 
-
-export { createSalesOrder, getSalesOrders, updateSalesOrder, updateSalesOrderStatus };
+export { createSalesOrder, getSalesOrderById, getSalesOrders, updateSalesOrder, updateSalesOrderStatus };
 

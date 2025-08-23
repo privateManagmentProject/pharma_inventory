@@ -1,6 +1,7 @@
 import axios from "axios";
 import React, { useEffect, useState } from "react";
-import DataTable from "./DataTable";
+import DataTable from "../components/DataTable";
+import FormField from "../components/FormField";
 
 const Products = () => {
   const [addEditModal, setAddEditModal] = useState(null);
@@ -25,7 +26,7 @@ const Products = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
   const [supplierFilter, setSupplierFilter] = useState("");
-
+  const [imageFile, setImageFile] = useState(null);
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({
@@ -64,19 +65,35 @@ const Products = () => {
   useEffect(() => {
     fetchProducts();
   }, [searchTerm, categoryFilter, supplierFilter]);
+  const handleImageChange = (e) => {
+    setImageFile(e.target.files[0]);
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
+      const formDataToSend = new FormData();
+
+      // Append all form data
+      Object.keys(formData).forEach((key) => {
+        formDataToSend.append(key, formData[key]);
+      });
+
+      // Append image file
+      if (imageFile) {
+        formDataToSend.append("image", imageFile);
+      }
+
       const url = editProduct
         ? `https://inventory-backend-ajj1.onrender.com/api/product/${editProduct._id}`
         : "https://inventory-backend-ajj1.onrender.com/api/product/add";
 
       const method = editProduct ? "put" : "post";
 
-      const response = await axios[method](url, formData, {
+      const response = await axios[method](url, formDataToSend, {
         headers: {
           Authorization: `Bearer ${localStorage.getItem("pos-token")}`,
+          "Content-Type": "multipart/form-data",
         },
       });
 
@@ -97,6 +114,7 @@ const Products = () => {
           categoryId: "",
           supplierId: "",
         });
+        setImageFile(null);
         fetchProducts();
       } else {
         alert(
@@ -109,6 +127,50 @@ const Products = () => {
       alert(`Error ${editProduct ? "updating" : "adding"} product`, error);
     }
   };
+  // const handleSubmit = async (e) => {
+  //   e.preventDefault();
+  //   try {
+  //     const url = editProduct
+  //       ? `https://inventory-backend-ajj1.onrender.com/api/product/${editProduct._id}`
+  //       : "https://inventory-backend-ajj1.onrender.com/api/product/add";
+
+  //     const method = editProduct ? "put" : "post";
+
+  //     const response = await axios[method](url, formData, {
+  //       headers: {
+  //         Authorization: `Bearer ${localStorage.getItem("pos-token")}`,
+  //       },
+  //     });
+
+  //     if (response.data.success) {
+  //       alert(`Product ${editProduct ? "updated" : "added"} successfully`);
+  //       setAddEditModal(null);
+  //       setEditProduct(null);
+  //       setFormData({
+  //         name: "",
+  //         brandName: "",
+  //         description: "",
+  //         manufacturer: "",
+  //         price: "",
+  //         supplierPrice: "",
+  //         expiryDate: "",
+  //         stock: "",
+  //         packageSize: "",
+  //         categoryId: "",
+  //         supplierId: "",
+  //       });
+  //       fetchProducts();
+  //     } else {
+  //       alert(
+  //         `Error ${
+  //           editProduct ? "updating" : "adding"
+  //         } product. Please try again.`
+  //       );
+  //     }
+  //   } catch (error) {
+  //     alert(`Error ${editProduct ? "updating" : "adding"} product`, error);
+  //   }
+  // };
 
   const handleEdit = (product) => {
     setEditProduct(product);
@@ -128,6 +190,24 @@ const Products = () => {
       supplierId: product.supplierId?._id,
     });
     setAddEditModal(true);
+  };
+
+  const resetForm = () => {
+    setFormData({
+      name: "",
+      brandName: "",
+      description: "",
+      manufacturer: "",
+      price: "",
+      supplierPrice: "",
+      expiryDate: "",
+      stock: "",
+      packageSize: "",
+      categoryId: "",
+      supplierId: "",
+    });
+    setImageFile(null);
+    setEditProduct(null);
   };
 
   const handleDelete = async (id) => {
@@ -154,22 +234,23 @@ const Products = () => {
     }
   };
 
-  const resetForm = () => {
-    setFormData({
-      name: "",
-      brandName: "",
-      description: "",
-      manufacturer: "",
-      price: "",
-      supplierPrice: "",
-      expiryDate: "",
-      stock: "",
-      packageSize: "",
-      categoryId: "",
-      supplierId: "",
-    });
-    setEditProduct(null);
-  };
+  // const resetForm = () => {
+  //   setFormData({
+  //     name: "",
+  //     brandName: "",
+  //     description: "",
+  //     manufacturer: "",
+  //     price: "",
+  //     supplierPrice: "",
+  //     expiryDate: "",
+  //     stock: "",
+  //     packageSize: "",
+  //     categoryId: "",
+  //     supplierId: "",
+  //   });
+  //   setEditProduct(null);
+  // };
+
   const productColumns = [
     { header: "Product Name", field: "name" },
     { header: "Brand", field: "brandName" },
@@ -186,6 +267,32 @@ const Products = () => {
       cell: (item) => item.supplierId?.name || "N/A",
     },
   ];
+
+  const packageSizeOptions = [
+    { value: "", label: "Select Package Size" },
+    { value: "kg", label: "kg" },
+    { value: "box", label: "box" },
+    { value: "bottle", label: "bottle" },
+    { value: "pack", label: "pack" },
+    { value: "unit", label: "unit" },
+  ];
+
+  const categoryOptions = [
+    { value: "", label: "Select Category" },
+    ...categories.map((category) => ({
+      value: category._id,
+      label: category.categoryName,
+    })),
+  ];
+
+  const supplierOptions = [
+    { value: "", label: "Select Supplier" },
+    ...suppliers.map((supplier) => ({
+      value: supplier._id,
+      label: supplier.name,
+    })),
+  ];
+
   return (
     <div className="w-full h-full flex flex-col gap-4 p-4">
       <h1 className="text-2xl font-bold">Product Management</h1>
@@ -241,178 +348,169 @@ const Products = () => {
         onEdit={handleEdit}
         onDelete={(product) => handleDelete(product._id)}
         loading={loading}
-        hasCheckbox={false}
+        hasCheckbox={true}
       />
 
       {addEditModal && (
         <div className="fixed top-0 left-0 w-full h-full bg-black/50 flex justify-center items-center p-4">
-          <div className="bg-white p-4 rounded shadow-md w-full max-w-4xl max-h-screen overflow-y-auto relative">
-            <h1 className="text-xl font-bold">
-              {editProduct ? "Edit" : "Add"} Product
-            </h1>
-            <button
-              className="absolute top-4 right-4 font-bold text-lg cursor-pointer"
-              onClick={() => {
-                setAddEditModal(null);
-                resetForm();
-              }}
-            >
-              X
-            </button>
-            <form className="flex flex-col gap-4 mt-4" onSubmit={handleSubmit}>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="flex flex-col gap-1">
-                  <label className="font-medium">Product Name</label>
-                  <input
-                    type="text"
+          <div className="bg-white border-4 rounded-lg shadow relative w-full max-w-4xl max-h-screen overflow-y-auto">
+            <div className="flex items-start justify-between p-5 border-b rounded-t">
+              <h3 className="text-xl font-semibold">
+                {editProduct ? "Edit" : "Add"} Product
+              </h3>
+              <button
+                type="button"
+                className="text-gray-400 bg-transparent hover:bg-gray-200 hover:text-gray-900 rounded-lg text-sm p-1.5 ml-auto inline-flex items-center"
+                onClick={() => {
+                  setAddEditModal(null);
+                  resetForm();
+                }}
+              >
+                <svg
+                  className="w-5 h-5"
+                  fill="currentColor"
+                  viewBox="0 0 20 20"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    fillRule="evenodd"
+                    d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
+                    clipRule="evenodd"
+                  ></path>
+                </svg>
+              </button>
+            </div>
+            <div className="p-6 space-y-6">
+              <form onSubmit={handleSubmit}>
+                <div className="grid grid-cols-6 gap-6">
+                  <div className="col-span-6">
+                    <label className="block text-sm font-medium text-gray-900 mb-2">
+                      Product Image
+                    </label>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleImageChange}
+                      className="border p-2 bg-white rounded px-4 w-full"
+                    />
+                    {editProduct?.image && (
+                      <div className="mt-2">
+                        <p className="text-sm text-gray-500">Current Image:</p>
+                        <img
+                          src={editProduct.image}
+                          alt="Product"
+                          className="h-20 object-cover mt-1"
+                        />
+                      </div>
+                    )}
+                  </div>
+                  <FormField
+                    label="Product Name"
                     name="name"
-                    placeholder="Product Name"
                     value={formData.name}
                     onChange={handleChange}
-                    className="border p-2 rounded"
+                    placeholder="Product Name"
                     required
                   />
-                </div>
-                <div className="flex flex-col gap-1">
-                  <label className="font-medium">Brand Name</label>
-                  <input
-                    type="text"
+                  <FormField
+                    label="Brand Name"
                     name="brandName"
-                    placeholder="Brand Name"
                     value={formData.brandName}
                     onChange={handleChange}
-                    className="border p-2 rounded"
+                    placeholder="Brand Name"
                   />
-                </div>
-                <div className="flex flex-col gap-1 md:col-span-2">
-                  <label className="font-medium">Description</label>
-                  <textarea
+                  <FormField
+                    label="Description"
                     name="description"
-                    placeholder="Description"
+                    type="textarea"
                     value={formData.description}
                     onChange={handleChange}
-                    className="border p-2 rounded"
+                    placeholder="Description"
                     required
                   />
-                </div>
-                <div className="flex flex-col gap-1">
-                  <label className="font-medium">Manufacturer</label>
-                  <input
-                    type="text"
+                  <FormField
+                    label="Manufacturer"
                     name="manufacturer"
-                    placeholder="Manufacturer"
                     value={formData.manufacturer}
                     onChange={handleChange}
-                    className="border p-2 rounded"
+                    placeholder="Manufacturer"
                   />
-                </div>
-                <div className="flex flex-col gap-1">
-                  <label className="font-medium">Price</label>
-                  <input
-                    type="number"
+                  <FormField
+                    label="Price"
                     name="price"
-                    placeholder="Price"
+                    type="number"
                     value={formData.price}
                     onChange={handleChange}
-                    className="border p-2 rounded"
+                    placeholder="Price"
                     required
+                    step="0.01"
                   />
-                </div>
-                <div className="flex flex-col gap-1">
-                  <label className="font-medium">Supplier Price</label>
-                  <input
-                    type="number"
+                  <FormField
+                    label="Supplier Price"
                     name="supplierPrice"
-                    placeholder="Supplier Price"
+                    type="number"
                     value={formData.supplierPrice}
                     onChange={handleChange}
-                    className="border p-2 rounded"
+                    placeholder="Supplier Price"
                     required
+                    step="0.01"
                   />
-                </div>
-                <div className="flex flex-col gap-1">
-                  <label className="font-medium">Expiry Date</label>
-                  <input
-                    type="date"
+                  <FormField
+                    label="Expiry Date"
                     name="expiryDate"
-                    placeholder="Expiry Date"
+                    type="date"
                     value={formData.expiryDate}
                     onChange={handleChange}
-                    className="border p-2 rounded"
+                    placeholder="Expiry Date"
                     required
                   />
-                </div>
-                <div className="flex flex-col gap-1">
-                  <label className="font-medium">Stock Quantity</label>
-                  <input
-                    type="number"
+                  <FormField
+                    label="Stock Quantity"
                     name="stock"
-                    placeholder="Stock Quantity"
+                    type="number"
                     value={formData.stock}
                     onChange={handleChange}
-                    className="border p-2 rounded"
+                    placeholder="Stock Quantity"
+                    required
+                  />
+                  <FormField
+                    label="Package Size"
+                    name="packageSize"
+                    type="select"
+                    value={formData.packageSize}
+                    onChange={handleChange}
+                    options={packageSizeOptions}
+                    required
+                  />
+                  <FormField
+                    label="Category"
+                    name="categoryId"
+                    type="select"
+                    value={formData.categoryId}
+                    onChange={handleChange}
+                    options={categoryOptions}
+                    required
+                  />
+                  <FormField
+                    label="Supplier"
+                    name="supplierId"
+                    type="select"
+                    value={formData.supplierId}
+                    onChange={handleChange}
+                    options={supplierOptions}
                     required
                   />
                 </div>
-                <div className="flex flex-col gap-1">
-                  <label className="font-medium">Package Size</label>
-                  <select
-                    name="packageSize"
-                    value={formData.packageSize}
-                    onChange={handleChange}
-                    className="border p-2 rounded"
-                    required
+                <div className="p-6 border-t border-gray-200 rounded-b">
+                  <button
+                    type="submit"
+                    className="text-white bg-cyan-600 hover:bg-cyan-700 focus:ring-4 focus:ring-cyan-200 font-medium rounded-lg text-sm px-5 py-2.5 text-center"
                   >
-                    <option value="">Select Package Size</option>
-                    <option value="kg">kg</option>
-                    <option value="box">box</option>
-                    <option value="bottle">bottle</option>
-                    <option value="pack">pack</option>
-                    <option value="unit">unit</option>
-                  </select>
+                    {editProduct ? "Update" : "Add"} Product
+                  </button>
                 </div>
-                <div className="flex flex-col gap-1">
-                  <label className="font-medium">Category</label>
-                  <select
-                    name="categoryId"
-                    value={formData.categoryId}
-                    onChange={handleChange}
-                    className="border p-2 rounded"
-                    required
-                  >
-                    <option value="">Select Category</option>
-                    {categories.map((category) => (
-                      <option key={category._id} value={category._id}>
-                        {category.categoryName}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div className="flex flex-col gap-1">
-                  <label className="font-medium">Supplier</label>
-                  <select
-                    name="supplierId"
-                    value={formData.supplierId}
-                    onChange={handleChange}
-                    className="border p-2 rounded"
-                    required
-                  >
-                    <option value="">Select Supplier</option>
-                    {suppliers.map((supplier) => (
-                      <option key={supplier._id} value={supplier._id}>
-                        {supplier.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-              <button
-                type="submit"
-                className="px-4 py-2 bg-blue-500 text-white rounded cursor-pointer mt-4"
-              >
-                {editProduct ? "Update" : "Add"} Product
-              </button>
-            </form>
+              </form>
+            </div>
           </div>
         </div>
       )}
