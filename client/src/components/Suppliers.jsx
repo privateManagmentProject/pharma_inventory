@@ -11,9 +11,10 @@ const Suppliers = () => {
     address: "",
   });
   const [suppliers, setSuppliers] = useState([]);
-  const [Loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [filteredSuppliers, setFilteredSuppliers] = useState([]);
+
   useEffect(() => {
     if (searchTerm) {
       const filtered = suppliers.filter(
@@ -36,6 +37,7 @@ const Suppliers = () => {
       [name]: value,
     }));
   };
+
   const fetchSupplier = async () => {
     setLoading(true);
     try {
@@ -43,13 +45,11 @@ const Suppliers = () => {
         "https://inventory-backend-ajj1.onrender.com/api/supplier",
         {
           headers: {
-            // "Content-Type": "application/json",
             Authorization: `Bearer ${localStorage.getItem("pos-token")}`,
           },
         }
       );
       setSuppliers(response.data.supplier);
-      console.log(response.data.suppl);
       setLoading(false);
     } catch (error) {
       setLoading(false);
@@ -58,9 +58,11 @@ const Suppliers = () => {
       setLoading(false);
     }
   };
+
   useEffect(() => {
     fetchSupplier();
   }, []);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
@@ -69,58 +71,29 @@ const Suppliers = () => {
         formData,
         {
           headers: {
-            // "Content-Type": "application/json",
             Authorization: `Bearer ${localStorage.getItem("pos-token")}`,
           },
         }
       );
 
       if (response.data.success) {
-        alert("Supplier add succesfull");
+        alert("Supplier added successfully");
         setAddEditModal(null);
-
-        // fetchCategory();
+        setFormData({
+          name: "",
+          email: "",
+          phone: "",
+          address: "",
+        });
+        fetchSupplier();
       } else {
-        alert("error  adding supplier. Please try again.");
+        alert("Error adding supplier. Please try again.");
       }
     } catch (error) {
-      alert("error adding supplier", error);
+      alert("Error adding supplier", error);
     }
   };
-  //   const [supplierEmail, setSupplierEmail] = useState("");
-  //   const [Loading, setLoading] = useState(true);
-  //   const [editCategory, setEditCategory] = useState(null);
 
-  //   const fetchCategory = async () => {
-  //     try {
-  //       const response = await axios.get("https://inventory-backend-ajj1.onrender.com/api/category", {
-  //         headers: {
-  //           // "Content-Type": "application/json",
-  //           Authorization: `Bearer ${localStorage.getItem("pos-token")}`,
-  //         },
-  //       });
-  //       setCategories(response.data.categories);
-  //       setLoading(false);
-  //     } catch (error) {
-  //       setLoading(true);
-  //       alert("Error fetching catgories, please try again", error);
-  //     }
-  //   };
-  //   useEffect(() => {
-  //     fetchCategory();
-  //   }, []);
-
-  //   const handleEdit = async (category) => {
-  //     setEditCategory(category._id);
-  //     setCategoryName(category.categoryName);
-  //     setCategoryName(category.categoryDescription);
-  //   };
-  //   const handleCancel = async () => {
-  //     setEditCategory(null);
-  //     setCategoryName("");
-  //     setCategoryDescription("");
-  //   };
-  //   if (Loading) return <div>Loading...</div>;
   const supplierColumns = [
     { header: "Supplier Name", field: "name" },
     { header: "Email", field: "email" },
@@ -130,32 +103,34 @@ const Suppliers = () => {
 
   return (
     <div className="w-full h-full flex flex-col gap-4 p-4">
-      <h1 className="text-2xl font-bold"> Supplier Mangement</h1>
-      <div className="flex justify-between items-center">
+      <h1 className="text-2xl font-bold">Supplier Management</h1>
+
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-2">
         <input
           type="text"
           placeholder="Search suppliers..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          className="border p-1 bg-white rounded px-4"
+          className="border p-2 bg-white rounded px-4 w-full md:w-auto"
         />
         <button
-          className="px-4 py-1.5 bg-blue-500 text-white rounded cursor-pointer"
-          onClick={() => setAddEditModal(1)}
+          className="px-4 py-2 bg-blue-500 text-white rounded cursor-pointer w-full md:w-auto mt-2 md:mt-0"
+          onClick={() => setAddEditModal(true)}
         >
           Add Supplier
         </button>
       </div>
+
       <DataTable
         columns={supplierColumns}
         data={filteredSuppliers}
-        loading={Loading}
+        loading={loading}
         hasCheckbox={false}
       />
 
       {addEditModal && (
-        <div className="fixed top-0 left-0 w-full h-full bg-black/50 flex justify-center items-center">
-          <div className="bg-white p-4 rounded shadow-md w-1/3 relative">
+        <div className="fixed top-0 left-0 w-full h-full bg-black/50 flex justify-center items-center p-4">
+          <div className="bg-white p-4 rounded shadow-md w-full max-w-md relative">
             <h1 className="text-xl font-bold">Add Supplier</h1>
             <button
               className="absolute top-4 right-4 font-bold text-lg cursor-pointer"
@@ -164,41 +139,57 @@ const Suppliers = () => {
               X
             </button>
             <form className="flex flex-col gap-4 mt-4" onSubmit={handleSubmit}>
-              <input
-                type="text"
-                name="name"
-                placeholder="Supplier Name "
-                value={formData.name}
-                onChange={handleChange}
-                className="border p-1 bg-white rounded px-4"
-              />
-              <input
-                type="email"
-                placeholder="Supplier Email "
-                name="email"
-                value={formData.email}
-                onChange={handleChange}
-                className="border p-1 bg-white rounded px-4"
-              />
-              <input
-                type="number"
-                placeholder="Supplier Phone"
-                name="number"
-                value={formData.number}
-                onChange={handleChange}
-                className="border p-1 bg-white rounded px-4"
-              />
-              <input
-                type="text"
-                placeholder="Supplier Address "
-                name="address"
-                value={formData.address}
-                onChange={handleChange}
-                className="border p-1 bg-white rounded px-4"
-              />
+              <div className="flex flex-col gap-1">
+                <label className="font-medium">Supplier Name</label>
+                <input
+                  type="text"
+                  name="name"
+                  placeholder="Supplier Name"
+                  value={formData.name}
+                  onChange={handleChange}
+                  className="border p-2 rounded"
+                  required
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="font-medium">Supplier Email</label>
+                <input
+                  type="email"
+                  placeholder="Supplier Email"
+                  name="email"
+                  value={formData.email}
+                  onChange={handleChange}
+                  className="border p-2 rounded"
+                  required
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="font-medium">Supplier Phone</label>
+                <input
+                  type="tel"
+                  placeholder="Supplier Phone"
+                  name="phone"
+                  value={formData.phone}
+                  onChange={handleChange}
+                  className="border p-2 rounded"
+                  required
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="font-medium">Supplier Address</label>
+                <input
+                  type="text"
+                  placeholder="Supplier Address"
+                  name="address"
+                  value={formData.address}
+                  onChange={handleChange}
+                  className="border p-2 rounded"
+                  required
+                />
+              </div>
               <button
-                className="px-4 py-1.5 bg-blue-500 text-white rounded cursor-pointer"
-                onClick={() => setAddEditModal(1)}
+                type="submit"
+                className="px-4 py-2 bg-blue-500 text-white rounded cursor-pointer mt-4"
               >
                 Add Supplier
               </button>

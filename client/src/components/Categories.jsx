@@ -25,7 +25,7 @@ const Categories = () => {
       setLoading(false);
     } catch (error) {
       setLoading(false);
-      alert("Error fetching categories, please try again");
+      alert("Error fetching categories, please try again", error);
     }
   };
 
@@ -67,7 +67,7 @@ const Categories = () => {
         );
       }
     } catch (error) {
-      alert(`Error ${editCategory ? "updating" : "adding"} category`);
+      alert(`Error ${editCategory ? "updating" : "adding"} category`, error);
     }
   };
 
@@ -97,7 +97,7 @@ const Categories = () => {
           alert("Error deleting category");
         }
       } catch (error) {
-        alert("Error deleting category");
+        alert("Error deleting category", error);
       }
     }
   };
@@ -117,19 +117,19 @@ const Categories = () => {
     <div className="w-full h-full flex flex-col gap-4 p-4">
       <h1 className="text-2xl font-bold">Category Management</h1>
 
-      <div className="flex justify-between items-center">
-        <div className="flex gap-2">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-2">
+        <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
           <input
             type="text"
             placeholder="Search categories..."
-            className="border p-1 bg-white rounded px-4"
-            onChange={(e) => {
-              // Add search functionality if needed
-            }}
+            className="border p-2 bg-white rounded px-4 w-full"
+            // onChange={(e) => {
+            //   // Add search functionality if needed
+            // }}
           />
         </div>
         <button
-          className="px-4 py-1.5 bg-blue-500 text-white rounded cursor-pointer"
+          className="px-4 py-2 bg-blue-500 text-white rounded cursor-pointer w-full md:w-auto"
           onClick={() => {
             resetForm();
             setAddEditModal(true);
@@ -149,8 +149,8 @@ const Categories = () => {
       />
 
       {addEditModal && (
-        <div className="fixed top-0 left-0 w-full h-full bg-black/50 flex justify-center items-center">
-          <div className="bg-white p-4 rounded shadow-md w-2/3 max-h-screen overflow-y-auto relative">
+        <div className="fixed top-0 left-0 w-full h-full bg-black/50 flex justify-center items-center p-4">
+          <div className="bg-white p-4 rounded shadow-md w-full max-w-md max-h-screen overflow-y-auto relative">
             <h1 className="text-xl font-bold">
               {editCategory ? "Edit" : "Add"} Category
             </h1>
@@ -164,27 +164,33 @@ const Categories = () => {
               X
             </button>
             <form className="flex flex-col gap-4 mt-4" onSubmit={handleSubmit}>
-              <div className="grid grid-cols-2 gap-4">
-                <input
-                  type="text"
-                  placeholder="Category Name"
-                  value={categoryName}
-                  onChange={(e) => setCategoryName(e.target.value)}
-                  className="border p-2 rounded"
-                  required
-                />
-                <input
-                  type="text"
-                  placeholder="Category Description"
-                  value={categoryDescription}
-                  onChange={(e) => setCategoryDescription(e.target.value)}
-                  className="border p-2 rounded"
-                  required
-                />
+              <div className="flex flex-col gap-4">
+                <div className="flex flex-col gap-1">
+                  <label className="font-medium">Category Name</label>
+                  <input
+                    type="text"
+                    placeholder="Category Name"
+                    value={categoryName}
+                    onChange={(e) => setCategoryName(e.target.value)}
+                    className="border p-2 rounded"
+                    required
+                  />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="font-medium">Category Description</label>
+                  <input
+                    type="text"
+                    placeholder="Category Description"
+                    value={categoryDescription}
+                    onChange={(e) => setCategoryDescription(e.target.value)}
+                    className="border p-2 rounded"
+                    required
+                  />
+                </div>
               </div>
               <button
                 type="submit"
-                className="px-4 py-2 bg-blue-500 text-white rounded cursor-pointer"
+                className="px-4 py-2 bg-blue-500 text-white rounded cursor-pointer mt-4"
               >
                 {editCategory ? "Update" : "Add"} Category
               </button>

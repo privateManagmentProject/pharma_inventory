@@ -44,7 +44,7 @@ const SalesOrders = () => {
 
       setSalesOrders(response.data.salesOrders);
     } catch (error) {
-      alert("Error fetching sales orders, please try again");
+      alert("Error fetching sales orders, please try again", error);
     } finally {
       setLoading(false);
     }
@@ -63,7 +63,7 @@ const SalesOrders = () => {
 
       setProducts(response.data.products);
     } catch (error) {
-      alert("Error fetching products, please try again");
+      alert("Error fetching products, please try again", error);
     }
   };
 
@@ -127,7 +127,7 @@ const SalesOrders = () => {
         alert("Error updating sales order status");
       }
     } catch (error) {
-      alert("Error updating sales order status");
+      alert("Error updating sales order status", error);
     }
   };
 
@@ -179,26 +179,26 @@ const SalesOrders = () => {
     <div className="w-full h-full flex flex-col gap-4 p-4">
       <h1 className="text-2xl font-bold">Sales Orders Management</h1>
 
-      <div className="flex justify-between items-center">
-        <div className="flex gap-2">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-2">
+        <div className="flex flex-col sm:flex-row gap-2 w-full">
           <input
             type="text"
             placeholder="Search by customer..."
             value={customerSearch}
             onChange={(e) => setCustomerSearch(e.target.value)}
-            className="border p-1 bg-white rounded px-4"
+            className="border p-2 bg-white rounded px-4 w-full"
           />
           <input
             type="text"
             placeholder="Search by product..."
             value={productSearch}
             onChange={(e) => setProductSearch(e.target.value)}
-            className="border p-1 bg-white rounded px-4"
+            className="border p-2 bg-white rounded px-4 w-full"
           />
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="border p-1 bg-white rounded px-4"
+            className="border p-2 bg-white rounded px-4 w-full sm:w-auto"
           >
             <option value="">All Status</option>
             <option value="pending">Pending</option>
@@ -207,7 +207,7 @@ const SalesOrders = () => {
           </select>
         </div>
         <button
-          className="px-4 py-1.5 bg-blue-500 text-white rounded cursor-pointer"
+          className="px-4 py-2 bg-blue-500 text-white rounded cursor-pointer w-full md:w-auto mt-2 md:mt-0"
           onClick={() => setAddModal(true)}
         >
           Create Sales Order
@@ -291,8 +291,8 @@ const SalesOrders = () => {
       )}
 
       {addModal && (
-        <div className="fixed top-0 left-0 w-full h-full bg-black/50 flex justify-center items-center">
-          <div className="bg-white p-4 rounded shadow-md w-1/2 relative">
+        <div className="fixed top-0 left-0 w-full h-full bg-black/50 flex justify-center items-center p-4">
+          <div className="bg-white p-4 rounded shadow-md w-full max-w-md relative">
             <h1 className="text-xl font-bold">Create Sales Order</h1>
             <button
               className="absolute top-4 right-4 font-bold text-lg cursor-pointer"
@@ -310,60 +310,75 @@ const SalesOrders = () => {
               X
             </button>
             <form className="flex flex-col gap-4 mt-4" onSubmit={handleSubmit}>
-              <select
-                name="productId"
-                value={formData.productId}
-                onChange={handleChange}
-                className="border p-2 rounded"
-                required
-              >
-                <option value="">Select Product</option>
-                {products.map((product) => (
-                  <option key={product._id} value={product._id}>
-                    {product.name} - Stock: {product.stock}{" "}
-                    {product.packageSize}
-                  </option>
-                ))}
-              </select>
-              <input
-                type="number"
-                name="quantity"
-                placeholder="Quantity"
-                value={formData.quantity}
-                onChange={handleChange}
-                className="border p-2 rounded"
-                required
-              />
-              <input
-                type="text"
-                name="packageSize"
-                placeholder="Package Size (e.g., kg, units)"
-                value={formData.packageSize}
-                onChange={handleChange}
-                className="border p-2 rounded"
-                required
-              />
-              <input
-                type="number"
-                name="salesPrice"
-                placeholder="Sales Price"
-                value={formData.salesPrice}
-                onChange={handleChange}
-                className="border p-2 rounded"
-                required
-              />
-              <input
-                type="text"
-                name="customerName"
-                placeholder="Customer Name"
-                value={formData.customerName}
-                onChange={handleChange}
-                className="border p-2 rounded"
-                required
-              />
+              <div className="flex flex-col gap-1">
+                <label className="font-medium">Product</label>
+                <select
+                  name="productId"
+                  value={formData.productId}
+                  onChange={handleChange}
+                  className="border p-2 rounded"
+                  required
+                >
+                  <option value="">Select Product</option>
+                  {products.map((product) => (
+                    <option key={product._id} value={product._id}>
+                      {product.name} - Stock: {product.stock}{" "}
+                      {product.packageSize}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="font-medium">Quantity</label>
+                <input
+                  type="number"
+                  name="quantity"
+                  placeholder="Quantity"
+                  value={formData.quantity}
+                  onChange={handleChange}
+                  className="border p-2 rounded"
+                  required
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="font-medium">Package Size</label>
+                <input
+                  type="text"
+                  name="packageSize"
+                  placeholder="Package Size (e.g., kg, units)"
+                  value={formData.packageSize}
+                  onChange={handleChange}
+                  className="border p-2 rounded"
+                  required
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="font-medium">Sales Price</label>
+                <input
+                  type="number"
+                  name="salesPrice"
+                  placeholder="Sales Price"
+                  value={formData.salesPrice}
+                  onChange={handleChange}
+                  className="border p-2 rounded"
+                  required
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="font-medium">Customer Name</label>
+                <input
+                  type="text"
+                  name="customerName"
+                  placeholder="Customer Name"
+                  value={formData.customerName}
+                  onChange={handleChange}
+                  className="border p-2 rounded"
+                  required
+                />
+              </div>
               <button
                 type="submit"
-                className="px-4 py-2 bg-blue-500 text-white rounded cursor-pointer"
+                className="px-4 py-2 bg-blue-500 text-white rounded cursor-pointer mt-4"
               >
                 Create Order
               </button>

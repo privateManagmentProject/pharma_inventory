@@ -55,7 +55,7 @@ const Products = () => {
       setCategories(response.data.categories || []);
       setSuppliers(response.data.suppliers || []);
     } catch (error) {
-      alert("Error fetching products, please try again");
+      alert("Error fetching products, please try again", error);
     } finally {
       setLoading(false);
     }
@@ -106,7 +106,7 @@ const Products = () => {
         );
       }
     } catch (error) {
-      alert(`Error ${editProduct ? "updating" : "adding"} product`);
+      alert(`Error ${editProduct ? "updating" : "adding"} product`, error);
     }
   };
 
@@ -149,7 +149,7 @@ const Products = () => {
           alert("Error deleting product");
         }
       } catch (error) {
-        alert("Error deleting product");
+        alert("Error deleting product", error);
       }
     }
   };
@@ -190,19 +190,19 @@ const Products = () => {
     <div className="w-full h-full flex flex-col gap-4 p-4">
       <h1 className="text-2xl font-bold">Product Management</h1>
 
-      <div className="flex justify-between items-center">
-        <div className="flex gap-2">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-2">
+        <div className="flex flex-col sm:flex-row gap-2 w-full">
           <input
             type="text"
             placeholder="Search products..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="border p-1 bg-white rounded px-4"
+            className="border p-2 bg-white rounded px-4 w-full"
           />
           <select
             value={categoryFilter}
             onChange={(e) => setCategoryFilter(e.target.value)}
-            className="border p-1 bg-white rounded px-4"
+            className="border p-2 bg-white rounded px-4 w-full sm:w-auto"
           >
             <option value="">All Categories</option>
             {categories.map((category) => (
@@ -214,7 +214,7 @@ const Products = () => {
           <select
             value={supplierFilter}
             onChange={(e) => setSupplierFilter(e.target.value)}
-            className="border p-1 bg-white rounded px-4"
+            className="border p-2 bg-white rounded px-4 w-full sm:w-auto"
           >
             <option value="">All Suppliers</option>
             {suppliers.map((supplier) => (
@@ -225,7 +225,7 @@ const Products = () => {
           </select>
         </div>
         <button
-          className="px-4 py-1.5 bg-blue-500 text-white rounded cursor-pointer"
+          className="px-4 py-2 bg-blue-500 text-white rounded cursor-pointer w-full md:w-auto mt-2 md:mt-0"
           onClick={() => {
             resetForm();
             setAddEditModal(true);
@@ -235,63 +235,6 @@ const Products = () => {
         </button>
       </div>
 
-      {/* {loading ? (
-        <div>Loading ....</div>
-      ) : (
-        <div className="overflow-auto">
-          <table className="w-full border-collapse border border-gray-300 mt-4">
-            <thead>
-              <tr className="bg-gray-200">
-                <th className="border border-gray-300 p-2">S No</th>
-                <th className="border border-gray-300 p-2">Product Name</th>
-                <th className="border border-gray-300 p-2">Brand</th>
-                <th className="border border-gray-300 p-2">Price</th>
-                <th className="border border-gray-300 p-2">Stock</th>
-                <th className="border border-gray-300 p-2">Category</th>
-                <th className="border border-gray-300 p-2">Supplier</th>
-                <th className="border border-gray-300 p-2">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {products.map((product, index) => (
-                <tr key={product._id}>
-                  <td className="border border-gray-300 p-2">{index + 1}</td>
-                  <td className="border border-gray-300 p-2">{product.name}</td>
-                  <td className="border border-gray-300 p-2">
-                    {product.brandName}
-                  </td>
-                  <td className="border border-gray-300 p-2">
-                    ${product.price}
-                  </td>
-                  <td className="border border-gray-300 p-2">
-                    {product.stock}
-                  </td>
-                  <td className="border border-gray-300 p-2">
-                    {product.categoryId?.categoryName}
-                  </td>
-                  <td className="border border-gray-300 p-2">
-                    {product.supplierId?.name}
-                  </td>
-                  <td className="border border-gray-300 p-2">
-                    <button
-                      className="bg-blue-500 text-white p-2 rounded-md hover:bg-blue-600 mr-2"
-                      onClick={() => handleEdit(product)}
-                    >
-                      Edit
-                    </button>
-                    <button
-                      className="bg-red-500 text-white p-2 rounded-md hover:bg-red-600"
-                      onClick={() => handleDelete(product._id)}
-                    >
-                      Delete
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )} */}
       <DataTable
         columns={productColumns}
         data={products}
@@ -302,8 +245,8 @@ const Products = () => {
       />
 
       {addEditModal && (
-        <div className="fixed top-0 left-0 w-full h-full bg-black/50 flex justify-center items-center">
-          <div className="bg-white p-4 rounded shadow-md w-2/3 max-h-screen overflow-y-auto relative">
+        <div className="fixed top-0 left-0 w-full h-full bg-black/50 flex justify-center items-center p-4">
+          <div className="bg-white p-4 rounded shadow-md w-full max-w-4xl max-h-screen overflow-y-auto relative">
             <h1 className="text-xl font-bold">
               {editProduct ? "Edit" : "Add"} Product
             </h1>
@@ -317,117 +260,150 @@ const Products = () => {
               X
             </button>
             <form className="flex flex-col gap-4 mt-4" onSubmit={handleSubmit}>
-              <div className="grid grid-cols-2 gap-4">
-                <input
-                  type="text"
-                  name="name"
-                  placeholder="Product Name"
-                  value={formData.name}
-                  onChange={handleChange}
-                  className="border p-2 rounded"
-                  required
-                />
-                <input
-                  type="text"
-                  name="brandName"
-                  placeholder="Brand Name"
-                  value={formData.brandName}
-                  onChange={handleChange}
-                  className="border p-2 rounded"
-                />
-                <textarea
-                  name="description"
-                  placeholder="Description"
-                  value={formData.description}
-                  onChange={handleChange}
-                  className="border p-2 rounded col-span-2"
-                  required
-                />
-                <input
-                  type="text"
-                  name="manufacturer"
-                  placeholder="Manufacturer"
-                  value={formData.manufacturer}
-                  onChange={handleChange}
-                  className="border p-2 rounded"
-                />
-                <input
-                  type="number"
-                  name="price"
-                  placeholder="Price"
-                  value={formData.price}
-                  onChange={handleChange}
-                  className="border p-2 rounded"
-                  required
-                />
-                <input
-                  type="number"
-                  name="supplierPrice"
-                  placeholder="Supplier Price"
-                  value={formData.supplierPrice}
-                  onChange={handleChange}
-                  className="border p-2 rounded"
-                  required
-                />
-                <input
-                  type="date"
-                  name="expiryDate"
-                  placeholder="Expiry Date"
-                  value={formData.expiryDate}
-                  onChange={handleChange}
-                  className="border p-2 rounded"
-                  required
-                />
-                <input
-                  type="number"
-                  name="stock"
-                  placeholder="Stock Quantity"
-                  value={formData.stock}
-                  onChange={handleChange}
-                  className="border p-2 rounded"
-                  required
-                />
-                <input
-                  type="text"
-                  name="packageSize"
-                  placeholder="Package Size"
-                  value={formData.packageSize}
-                  onChange={handleChange}
-                  className="border p-2 rounded"
-                  required
-                />
-                <select
-                  name="categoryId"
-                  value={formData.categoryId}
-                  onChange={handleChange}
-                  className="border p-2 rounded"
-                  required
-                >
-                  <option value="">Select Category</option>
-                  {categories.map((category) => (
-                    <option key={category._id} value={category._id}>
-                      {category.categoryName}
-                    </option>
-                  ))}
-                </select>
-                <select
-                  name="supplierId"
-                  value={formData.supplierId}
-                  onChange={handleChange}
-                  className="border p-2 rounded"
-                  required
-                >
-                  <option value="">Select Supplier</option>
-                  {suppliers.map((supplier) => (
-                    <option key={supplier._id} value={supplier._id}>
-                      {supplier.name}
-                    </option>
-                  ))}
-                </select>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="flex flex-col gap-1">
+                  <label className="font-medium">Product Name</label>
+                  <input
+                    type="text"
+                    name="name"
+                    placeholder="Product Name"
+                    value={formData.name}
+                    onChange={handleChange}
+                    className="border p-2 rounded"
+                    required
+                  />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="font-medium">Brand Name</label>
+                  <input
+                    type="text"
+                    name="brandName"
+                    placeholder="Brand Name"
+                    value={formData.brandName}
+                    onChange={handleChange}
+                    className="border p-2 rounded"
+                  />
+                </div>
+                <div className="flex flex-col gap-1 md:col-span-2">
+                  <label className="font-medium">Description</label>
+                  <textarea
+                    name="description"
+                    placeholder="Description"
+                    value={formData.description}
+                    onChange={handleChange}
+                    className="border p-2 rounded"
+                    required
+                  />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="font-medium">Manufacturer</label>
+                  <input
+                    type="text"
+                    name="manufacturer"
+                    placeholder="Manufacturer"
+                    value={formData.manufacturer}
+                    onChange={handleChange}
+                    className="border p-2 rounded"
+                  />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="font-medium">Price</label>
+                  <input
+                    type="number"
+                    name="price"
+                    placeholder="Price"
+                    value={formData.price}
+                    onChange={handleChange}
+                    className="border p-2 rounded"
+                    required
+                  />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="font-medium">Supplier Price</label>
+                  <input
+                    type="number"
+                    name="supplierPrice"
+                    placeholder="Supplier Price"
+                    value={formData.supplierPrice}
+                    onChange={handleChange}
+                    className="border p-2 rounded"
+                    required
+                  />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="font-medium">Expiry Date</label>
+                  <input
+                    type="date"
+                    name="expiryDate"
+                    placeholder="Expiry Date"
+                    value={formData.expiryDate}
+                    onChange={handleChange}
+                    className="border p-2 rounded"
+                    required
+                  />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="font-medium">Stock Quantity</label>
+                  <input
+                    type="number"
+                    name="stock"
+                    placeholder="Stock Quantity"
+                    value={formData.stock}
+                    onChange={handleChange}
+                    className="border p-2 rounded"
+                    required
+                  />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="font-medium">Package Size</label>
+                  <input
+                    type="text"
+                    name="packageSize"
+                    placeholder="Package Size"
+                    value={formData.packageSize}
+                    onChange={handleChange}
+                    className="border p-2 rounded"
+                    required
+                  />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="font-medium">Category</label>
+                  <select
+                    name="categoryId"
+                    value={formData.categoryId}
+                    onChange={handleChange}
+                    className="border p-2 rounded"
+                    required
+                  >
+                    <option value="">Select Category</option>
+                    {categories.map((category) => (
+                      <option key={category._id} value={category._id}>
+                        {category.categoryName}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="font-medium">Supplier</label>
+                  <select
+                    name="supplierId"
+                    value={formData.supplierId}
+                    onChange={handleChange}
+                    className="border p-2 rounded"
+                    required
+                  >
+                    <option value="">Select Supplier</option>
+                    {suppliers.map((supplier) => (
+                      <option key={supplier._id} value={supplier._id}>
+                        {supplier.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
               <button
                 type="submit"
-                className="px-4 py-2 bg-blue-500 text-white rounded cursor-pointer"
+                className="px-4 py-2 bg-blue-500 text-white rounded cursor-pointer mt-4"
               >
                 {editProduct ? "Update" : "Add"} Product
               </button>

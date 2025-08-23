@@ -1,21 +1,25 @@
-import React from "react";
+import React, { useState } from "react";
+import { useNavigate } from "react-router";
+import { useAuth } from "../context/AuthContext";
 
 const Header = () => {
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
+
+  const handleLogout = () => {
+    logout();
+    navigate("/login");
+  };
+
   return (
-    <header className="bg-white dark:bg-gray-800 shadow-md">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
-        <h1 className="text-xl font-bold text-gray-900 dark:text-white">
-          Dashboard
-        </h1>
-        <div className="flex items-center space-x-4">
-          <div className="relative">
-            <input
-              type="text"
-              placeholder="Search..."
-              className="pl-10 pr-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
+    <header className="bg-white shadow-md p-4 flex justify-between items-center">
+      {/* Search Field */}
+      <div className="flex-1 max-w-md">
+        {/* <div className="relative">
+          <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
             <svg
-              className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"
+              className="w-4 h-4 text-gray-500"
               aria-hidden="true"
               xmlns="http://www.w3.org/2000/svg"
               fill="none"
@@ -30,15 +34,45 @@ const Header = () => {
               />
             </svg>
           </div>
-          <div className="flex items-center space-x-2">
-            <img
-              className="h-8 w-8 rounded-full"
-              src="https://via.placeholder.com/32"
-              alt="User avatar"
-            />
-            <span className="text-gray-700 dark:text-gray-300">User Name</span>
+          <input
+            type="text"
+            placeholder="Search..."
+            className="block w-full p-2 pl-10 text-sm text-gray-900 border border-gray-300 rounded-lg bg-gray-50 focus:ring-blue-500 focus:border-blue-500"
+          />
+        </div> */}
+      </div>
+
+      {/* Profile Dropdown */}
+      <div className="relative ml-4">
+        <button
+          type="button"
+          className="flex items-center text-sm bg-gray-800 rounded-full focus:ring-4 focus:ring-gray-300"
+          onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+        >
+          <span className="sr-only">Open user menu</span>
+          <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-white font-medium">
+            {user?.name?.charAt(0) || "U"}
           </div>
-        </div>
+        </button>
+
+        {isDropdownOpen && (
+          <div className="absolute right-0 z-50 mt-2 w-48 bg-white rounded-lg shadow-lg py-1">
+            <div className="px-4 py-2 border-b">
+              <p className="text-sm font-medium text-gray-900">
+                {user?.name || "User"}
+              </p>
+              <p className="text-sm text-gray-500 truncate">
+                {user?.email || ""}
+              </p>
+            </div>
+            <button
+              onClick={handleLogout}
+              className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+            >
+              Sign out
+            </button>
+          </div>
+        )}
       </div>
     </header>
   );

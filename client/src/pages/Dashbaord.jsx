@@ -1,14 +1,15 @@
 import React from "react";
 import { Outlet } from "react-router";
+import Header from "../components/Header";
 import Sidebar from "../components/Sidebar";
 
-const Dashbaord = () => {
+const Dashboard = () => {
   return (
-    <div className="bg-gray-800">
-      {/* <Header /> */}
-      <div className="flex">
-        <Sidebar />
-        <div className="flex-1 ml-16 md:ml-64 bg-gray-100 min-h-screen">
+    <div className="bg-gray-100 min-h-screen">
+      <Sidebar />
+      <div className="ml-0 md:ml-64 transition-all duration-300">
+        <Header />
+        <div className="p-4">
           <Outlet />
         </div>
       </div>
@@ -16,4 +17,4 @@ const Dashbaord = () => {
   );
 };
 
-export default Dashbaord;
+export default Dashboard;
