@@ -1,9 +1,10 @@
 import axios from "axios";
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import ActionHeader from "../components/ActionHeader";
 import DataTable from "../components/DataTable";
 import FormField from "../components/FormField";
 import Toast from "../components/Toast";
+import { Button } from "../components/ui/button";
 const Categories = () => {
   const [categoryName, setCategoryName] = useState("");
   const [categoryDescription, setCategoryDescription] = useState("");
@@ -20,14 +21,11 @@ const Categories = () => {
   const fetchCategory = async () => {
     setLoading(true);
     try {
-      const response = await axios.get(
-        "https://inventory-backend-ajj1.onrender.com/api/category",
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("pos-token")}`,
-          },
-        }
-      );
+      const response = await axios.get("http://localhost:5000/api/category", {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("pos-token")}`,
+        },
+      });
       setCategories(response.data.categories);
       setLoading(false);
     } catch (error) {
@@ -44,8 +42,8 @@ const Categories = () => {
     e.preventDefault();
     try {
       const url = editCategory
-        ? `https://inventory-backend-ajj1.onrender.com/api/category/${editCategory}`
-        : "https://inventory-backend-ajj1.onrender.com/api/category/add";
+        ? `http://localhost:5000/api/category/${editCategory}`
+        : "http://localhost:5000/api/category/add";
 
       const method = editCategory ? "put" : "post";
 
@@ -96,7 +94,7 @@ const Categories = () => {
     if (window.confirm("Are you sure you want to delete this category?")) {
       try {
         const response = await axios.delete(
-          `https://inventory-backend-ajj1.onrender.com/api/category/${id}`,
+          `http://localhost:5000/api/category/${id}`,
           {
             headers: {
               Authorization: `Bearer ${localStorage.getItem("pos-token")}`,
@@ -217,13 +215,16 @@ const Categories = () => {
                     required
                   />
                 </div>
-                <div className="p-6 border-t border-gray-200 rounded-b">
-                  <button
+                <div>
+                  {/* <button
                     type="submit"
                     className="text-white bg-cyan-600 hover:bg-cyan-700 focus:ring-4 focus:ring-cyan-200 font-medium rounded-lg text-sm px-5 py-2.5 text-center"
                   >
                     {editCategory ? "Update" : "Add"} Category
-                  </button>
+                  </button> */}
+                  <Button variant="outline" type="submit">
+                    {editCategory ? "Update" : "Add"} Category
+                  </Button>
                 </div>
               </form>
             </div>

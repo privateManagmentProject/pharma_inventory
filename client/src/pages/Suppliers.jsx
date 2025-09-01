@@ -53,14 +53,11 @@ const Suppliers = () => {
   const fetchSuppliers = async () => {
     setLoading(true);
     try {
-      const response = await axios.get(
-        "https://inventory-backend-ajj1.onrender.com/api/supplier",
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("pos-token")}`,
-          },
-        }
-      );
+      const response = await axios.get("http://localhost:5000/api/supplier", {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("pos-token")}`,
+        },
+      });
       setSuppliers(response.data.suppliers);
       setLoading(false);
     } catch (error) {
@@ -95,7 +92,7 @@ const Suppliers = () => {
       let response;
       if (editSupplier) {
         response = await axios.put(
-          `https://inventory-backend-ajj1.onrender.com/api/supplier/${editSupplier._id}`,
+          `http://localhost:5000/api/supplier/${editSupplier._id}`,
           formDataToSend,
           {
             headers: {
@@ -106,7 +103,7 @@ const Suppliers = () => {
         );
       } else {
         response = await axios.post(
-          "https://inventory-backend-ajj1.onrender.com/api/supplier/add",
+          "http://localhost:5000/api/supplier/add",
           formDataToSend,
           {
             headers: {
@@ -164,7 +161,7 @@ const Suppliers = () => {
     if (window.confirm("Are you sure you want to delete this supplier?")) {
       try {
         const response = await axios.delete(
-          `https://inventory-backend-ajj1.onrender.com/api/supplier/${id}`,
+          `http://localhost:5000/api/supplier/${id}`,
           {
             headers: {
               Authorization: `Bearer ${localStorage.getItem("pos-token")}`,

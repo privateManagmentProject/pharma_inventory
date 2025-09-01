@@ -21,7 +21,7 @@ const createCategory = async (req, res) => {
 const getCategories = async(req, res) =>{
     try {
         const categories= await CategoryModel.find();
-        return  res.status(200).json({ success: false, categories})
+        return  res.status(200).json({ success: true, categories})
     } catch (error) {
         return res.status(500).json({ success: false, message: "Server error"})
     }

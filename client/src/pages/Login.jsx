@@ -16,7 +16,7 @@ const Login = () => {
     // Simulate an API call
     try {
       const response = await axios.post(
-        "https://inventory-backend-ajj1.onrender.com/api/auth/login",
+        "http://localhost:5000/api/auth/login",
         {
           email,
           password,

@@ -60,14 +60,11 @@ const Customers = () => {
   const fetchCustomers = async () => {
     setLoading(true);
     try {
-      const response = await axios.get(
-        "https://inventory-backend-ajj1.onrender.com/api/customer",
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("pos-token")}`,
-          },
-        }
-      );
+      const response = await axios.get("http://localhost:5000/api/customer", {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("pos-token")}`,
+        },
+      });
       setCustomers(response.data.customers);
       setLoading(false);
     } catch (error) {
@@ -81,7 +78,7 @@ const Customers = () => {
   const fetchCustomerDetail = async (id) => {
     try {
       const response = await axios.get(
-        `https://inventory-backend-ajj1.onrender.com/api/customer/${id}`,
+        `http://localhost:5000/api/customer/${id}`,
         {
           headers: {
             Authorization: `Bearer ${localStorage.getItem("pos-token")}`,
@@ -119,7 +116,7 @@ const Customers = () => {
       let response;
       if (editCustomer) {
         response = await axios.put(
-          `https://inventory-backend-ajj1.onrender.com/api/customer/${editCustomer._id}`,
+          `http://localhost:5000/api/customer/${editCustomer._id}`,
           formDataToSend,
           {
             headers: {
@@ -130,7 +127,7 @@ const Customers = () => {
         );
       } else {
         response = await axios.post(
-          "https://inventory-backend-ajj1.onrender.com/api/customer/add",
+          "http://localhost:5000/api/customer/add",
           formDataToSend,
           {
             headers: {
@@ -200,7 +197,7 @@ const Customers = () => {
     if (window.confirm("Are you sure you want to delete this customer?")) {
       try {
         const response = await axios.delete(
-          `https://inventory-backend-ajj1.onrender.com/api/customer/${id}`,
+          `http://localhost:5000/api/customer/${id}`,
           {
             headers: {
               Authorization: `Bearer ${localStorage.getItem("pos-token")}`,
@@ -610,12 +607,12 @@ const Customers = () => {
                       detailCustomer.licenses.map((license, index) => (
                         <div key={index} className="relative">
                           <img
-                            src={`https://inventory-backend-ajj1.onrender.com/${license}`}
+                            src={`http://localhost:5000/${license}`}
                             alt={`License ${index + 1}`}
                             className="w-full h-32 object-cover rounded"
                           />
                           <a
-                            href={`https://inventory-backend-ajj1.onrender.com/${license}`}
+                            href={`http://localhost:5000/${license}`}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="absolute bottom-2 right-2 bg-blue-500 text-white p-1 rounded text-xs"
