@@ -19,33 +19,35 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
   const menuItems = [
     {
       name: "Dashboard",
-      path: "/admin/dashboard",
+      path: "/admin",
       icon: <LayoutDashboard className="w-5 h-5" />,
     },
     {
       name: "Categories",
-      path: "/admin/dashboard/categories",
+      path: "/admin/categories",
       icon: <Grid3X3 className="w-5 h-5" />,
     },
-    {
-      name: "Products",
-      path: "/admin/dashboard/products",
-      icon: <Package className="w-5 h-5" />,
-    },
+
     {
       name: "Suppliers",
-      path: "/admin/dashboard/suppliers",
+      path: "/admin/suppliers",
       icon: <Users className="w-5 h-5" />,
     },
     {
-      name: "Orders",
-      path: "/admin/dashboard/salesOrders",
-      icon: <ShoppingCart className="w-5 h-5" />,
+      name: "Customers",
+      path: "/admin/customers",
+      icon: <User className="w-5 h-5" />,
     },
     {
-      name: "Customers",
-      path: "/admin/dashboard/customers",
-      icon: <User className="w-5 h-5" />,
+      name: "Products",
+      path: "/admin/products",
+      icon: <Package className="w-5 h-5" />,
+    },
+
+    {
+      name: "Orders",
+      path: "/admin/salesOrders",
+      icon: <ShoppingCart className="w-5 h-5" />,
     },
   ];
 

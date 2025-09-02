@@ -15,14 +15,13 @@ const storage = multer.diskStorage({
 const upload = multer({ 
   storage: storage,
   fileFilter: function (req, file, cb) {
-    if (file.mimetype.startsWith('image/')) {
+    if (file.mimetype.startsWith('image/') || file.mimetype === 'application/pdf') {
       cb(null, true);
     } else {
-      cb(new Error('Only image files are allowed!'), false);
+      cb(new Error('Only image and PDF files are allowed!'), false);
     }
   }
-}).array('licenses', 5); // Allow up to 5 license files
-
+}).array('licenses', 5);
 const createSupplier = async (req, res) => {
   try {
     upload(req, res, async function (err) {
@@ -40,9 +39,12 @@ const createSupplier = async (req, res) => {
         return res.status(400).json({ success: false, message: "Supplier already exists" });
       }
 
-      // Get file paths
-      const licenses = req.files ? req.files.map(file => file.path) : [];
-
+      // Process uploaded files
+      const licenses = req.files ? req.files.map(file => ({
+        name: file.originalname,
+        path: file.path,
+        type: file.mimetype
+      })) : [];
       const newSupplier = new SupplierModal({
         name, 
         email, 

@@ -8,7 +8,13 @@ import {
 import Layout from "./components/Layout";
 import { useAuth } from "./context/AuthContext";
 import ListCategory from "./pages/categories/ListCategory";
+import ListCustomers from "./pages/customers/ListCustomers";
 import Dashboard from "./pages/dashboard/dashboard";
+import DetailProduct from "./pages/products/DetailProduct";
+import EditProduct from "./pages/products/EditProduct";
+import ListProduct from "./pages/products/ListProduct";
+import NewProduct from "./pages/products/NewProduct";
+import ListSuppliers from "./pages/suppliers/ListSuppliers";
 import Login from "./pages/users/Login";
 
 // Create a QueryClient instance
@@ -53,7 +59,7 @@ function App() {
 
             {/* Admin routes with layout */}
             <Route
-              path="/admin/dashboard"
+              path="/admin"
               element={
                 <ProtectedRoute requiredRole="admin">
                   <Layout />
@@ -62,6 +68,13 @@ function App() {
             >
               <Route index element={<Dashboard />} />
               <Route path="categories" element={<ListCategory />} />
+              <Route path="suppliers" element={<ListSuppliers />} />
+              <Route path="customers" element={<ListCustomers />} />
+              <Route path="products" element={<ListProduct />}>
+                <Route path="new" element={<NewProduct />} />
+                <Route path=":id" element={<DetailProduct />} />
+                <Route path="edit/:id" element={<EditProduct />} />
+              </Route>
             </Route>
 
             {/* Customer dashboard */}
