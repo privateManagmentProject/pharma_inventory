@@ -6,6 +6,7 @@ import { Link, useParams } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import { GetProductByID } from "./api/productAPI";
 import type { Product } from "./constants/product";
+import { Badge } from "@/components/ui/badge";
 
 const DetailProduct = () => {
   const { id } = useParams<{ id: string }>();

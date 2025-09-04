@@ -21,7 +21,6 @@ export const getProducts = async (params?: string) => {
     return Promise.reject(error);
   }
 };
-
 export const addProduct = async (formData: FormData) => {
   try {
     const response = await api.post("/product/add", formData, {

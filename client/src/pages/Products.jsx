@@ -20,8 +20,8 @@ const Products = () => {
     supplierId: "",
   });
   const [products, setProducts] = useState([]);
-  const [categories, setCategories] = useState([]);
-  const [suppliers, setSuppliers] = useState([]);
+  const [categories, setCategories] = useState<any[]>([]);
+  const [suppliers, setSuppliers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
@@ -61,7 +61,24 @@ const Products = () => {
       setLoading(false);
     }
   };
-
+useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        const [categoriesRes, suppliersRes] = await Promise.all([
+          getCategories(),
+          getSuppliers()
+        ]);
+        setCategories(categoriesRes.categories || categoriesRes);
+        setSuppliers(suppliersRes.suppliers || suppliersRes);
+      } catch (error) {
+        console.error("Error fetching data:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, []);
   useEffect(() => {
     fetchProducts();
   }, [searchTerm, categoryFilter, supplierFilter]);

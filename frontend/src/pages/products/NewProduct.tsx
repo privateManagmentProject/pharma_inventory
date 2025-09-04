@@ -12,9 +12,11 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { Field, Form, Formik } from "formik";
 import { ArrowLeft } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import * as Yup from "yup";
+import { getCategories } from "../categories/api/categoryAPI";
+import { getSuppliers } from "../suppliers/api/supplierAPI";
 import { addProduct } from "./api/productAPI";
 
 const validationSchema = Yup.object({
@@ -41,9 +43,30 @@ const validationSchema = Yup.object({
 const NewProduct = () => {
   const navigate = useNavigate();
   const [imageFile, setImageFile] = useState<File | null>(null);
-  const [categories] = useState([]); // You would fetch these from your API
-  const [suppliers] = useState([]); // You would fetch these from your API
 
+  const [categories, setCategories] = useState<any[]>([]);
+  const [suppliers, setSuppliers] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  // Fetch categories and suppliers on component mount
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        const [categoriesRes, suppliersRes] = await Promise.all([
+          getCategories(),
+          getSuppliers(),
+        ]);
+        setCategories(categoriesRes.categories || categoriesRes);
+        setSuppliers(suppliersRes.suppliers || suppliersRes);
+      } catch (error) {
+        console.error("Error fetching data:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, []);
   const handleSubmit = async (values: any) => {
     try {
       const formData = new FormData();
@@ -59,7 +82,7 @@ const NewProduct = () => {
       }
 
       await addProduct(formData);
-      navigate("/products");
+      navigate("/admin/products");
     } catch (error) {
       console.error("Error adding product:", error);
     }
@@ -246,7 +269,7 @@ const NewProduct = () => {
                       <SelectContent>
                         {categories.map((category: any) => (
                           <SelectItem key={category._id} value={category._id}>
-                            {category.name}
+                            {category.categoryName}
                           </SelectItem>
                         ))}
                       </SelectContent>

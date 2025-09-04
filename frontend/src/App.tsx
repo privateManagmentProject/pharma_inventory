@@ -14,6 +14,10 @@ import DetailProduct from "./pages/products/DetailProduct";
 import EditProduct from "./pages/products/EditProduct";
 import ListProduct from "./pages/products/ListProduct";
 import NewProduct from "./pages/products/NewProduct";
+import DetailSalesOrder from "./pages/sales/ DetailSalesOrder";
+import EditSalesOrder from "./pages/sales/ EditSalesOrder";
+import ListSalesOrder from "./pages/sales/ListSalesOrder";
+import NewSalesOrder from "./pages/sales/NewSalesOrder";
 import ListSuppliers from "./pages/suppliers/ListSuppliers";
 import Login from "./pages/users/Login";
 
@@ -49,7 +53,7 @@ function App() {
               path="/"
               element={
                 <ProtectedRoute>
-                  <Navigate to="/admin/dashboard" replace />
+                  <Navigate to="/admin" replace />
                 </ProtectedRoute>
               }
             />
@@ -70,11 +74,14 @@ function App() {
               <Route path="categories" element={<ListCategory />} />
               <Route path="suppliers" element={<ListSuppliers />} />
               <Route path="customers" element={<ListCustomers />} />
-              <Route path="products" element={<ListProduct />}>
-                <Route path="new" element={<NewProduct />} />
-                <Route path=":id" element={<DetailProduct />} />
-                <Route path="edit/:id" element={<EditProduct />} />
-              </Route>
+              <Route path="products" element={<ListProduct />} />
+              <Route path="products/new" element={<NewProduct />} />
+              <Route path="products/:id" element={<DetailProduct />} />
+              <Route path="products/edit/:id" element={<EditProduct />} />
+              <Route path="salesOrders" element={<ListSalesOrder />} />
+              <Route path="salesOrders/new" element={<NewSalesOrder />} />
+              <Route path="salesOrders/edit/:id" element={<EditSalesOrder />} />
+              <Route path="salesOrders/:id" element={<DetailSalesOrder />} />
             </Route>
 
             {/* Customer dashboard */}

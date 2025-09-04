@@ -1,39 +1,36 @@
+import { DataTable } from "@/components/DataTable";
+import { IndeterminateCheckbox } from "@/components/IntermidateCheckBox";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import type { ColumnDef, SortingState } from "@tanstack/react-table";
 import { Edit, Eye, Plus, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { deleteProduct, getProducts } from "./api/productAPI";
 import type { Product } from "./constants/product";
 
 const ListProduct = () => {
+  const navigate = useNavigate();
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
   const [suppliers, setSuppliers] = useState<any[]>([]);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState("");
-  const [selectedSupplier, setSelectedSupplier] = useState("");
   const [loading, setLoading] = useState(true);
-
+  const [sorting, setSorting] = useState<SortingState>([]);
+  const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 10 });
+  const [searchValue, setSearchValue] = useState("");
   useEffect(() => {
     fetchProducts();
-  }, []);
+  }, [searchValue]);
 
   const fetchProducts = async () => {
     try {
       const params = new URLSearchParams();
-      if (searchTerm) params.append("search", searchTerm);
-      if (selectedCategory) params.append("category", selectedCategory);
-      if (selectedSupplier) params.append("supplier", selectedSupplier);
+      if (searchValue) params.append("search", searchValue);
+      if (pagination) {
+        params.append("page", (pagination.pageIndex + 1).toString());
+        params.append("limit", pagination.pageSize.toString());
+      }
 
       const response = await getProducts(params.toString());
       setProducts(response.products);
@@ -57,9 +54,109 @@ const ListProduct = () => {
     }
   };
 
-  const handleFilter = () => {
-    fetchProducts();
-  };
+  const columns: ColumnDef<Product>[] = [
+    {
+      id: "select",
+      header: ({ table }) => (
+        <IndeterminateCheckbox
+          checked={table.getIsAllRowsSelected()}
+          indeterminate={table.getIsSomeRowsSelected()}
+          onChange={table.getToggleAllRowsSelectedHandler()}
+        />
+      ),
+      cell: ({ row }) => (
+        <IndeterminateCheckbox
+          checked={row.getIsSelected()}
+          indeterminate={row.getIsSomeSelected()}
+          onChange={row.getToggleSelectedHandler()}
+        />
+      ),
+      size: 40,
+    },
+    {
+      header: "Image",
+      accessorKey: "image",
+      cell: ({ row }) => (
+        <img
+          src={`http://localhost:5000/${row.original.image}`}
+          alt={row.original.name}
+          className="h-10 w-10 object-cover rounded"
+        />
+      ),
+    },
+    {
+      header: "Name",
+      accessorKey: "name",
+    },
+    {
+      header: "Category",
+      accessorKey: "categoryId.name",
+      cell: ({ row }) => (
+        <Badge variant="outline">
+          {row.original.categoryId?.categoryName || "N/A"}
+        </Badge>
+      ),
+    },
+    {
+      header: "Supplier",
+      accessorKey: "supplierId.name",
+      cell: ({ row }) => row.original.supplierId?.name || "N/A",
+    },
+    {
+      header: "Price",
+      accessorKey: "price",
+      cell: ({ row }) => `$${row.original.price}`,
+    },
+    {
+      header: "Stock",
+      accessorKey: "stock",
+      cell: ({ row }) => (
+        <Badge
+          variant={
+            parseInt(row.original.stock) > 10 ? "default" : "destructive"
+          }
+        >
+          {row.original.stock}
+        </Badge>
+      ),
+    },
+    {
+      header: "Expiry Date",
+      accessorKey: "expiryDate",
+      cell: ({ row }) => new Date(row.original.expiryDate).toLocaleDateString(),
+    },
+    {
+      id: "actions",
+      cell: ({ row }) => {
+        const product = row.original;
+        return (
+          <div className="flex space-x-2">
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => navigate(`${product._id}`)}
+            >
+              <Eye className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => navigate(`edit/${product._id}`)}
+            >
+              <Edit className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => handleDelete(product._id!)}
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          </div>
+        );
+      },
+    },
+  ];
 
   if (loading) return <div>Loading...</div>;
 
@@ -67,133 +164,26 @@ const ListProduct = () => {
     <div className="container mx-auto p-6">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold">Products</h1>
-        <Link to="/new">
-          <Button>
-            <Plus className="mr-2 h-4 w-4" /> Add Product
-          </Button>
-        </Link>
+        <Button onClick={() => navigate("new")}>
+          <Plus className="mr-2 h-4 w-4" /> Add Product
+        </Button>
       </div>
 
-      {/* <Card className="mb-6">
-        <CardHeader>
-          <CardTitle>Filters</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <Input
-              placeholder="Search by name..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-            <Select
-              value={selectedCategory}
-              onValueChange={setSelectedCategory}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select category" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="">All Categories</SelectItem>
-                {categories.map((category) => (
-                  <SelectItem key={category._id} value={category._id}>
-                    {category.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select
-              value={selectedSupplier}
-              onValueChange={setSelectedSupplier}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select supplier" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="">All Suppliers</SelectItem>
-                {suppliers.map((supplier) => (
-                  <SelectItem key={supplier._id} value={supplier._id}>
-                    {supplier.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Button onClick={handleFilter}>Apply Filters</Button>
-          </div>
-        </CardContent>
-      </Card> */}
-
-      <Card>
+      <Card className="shadow-md bg-white dark:bg-gray-800">
         <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Image</TableHead>
-                <TableHead>Name</TableHead>
-                <TableHead>Category</TableHead>
-                <TableHead>Supplier</TableHead>
-                <TableHead>Price</TableHead>
-                <TableHead>Stock</TableHead>
-                <TableHead>Expiry Date</TableHead>
-                <TableHead>Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {products.map((product) => (
-                <TableRow key={product._id}>
-                  <TableCell>
-                    {product.image && (
-                      <img
-                        src={`http://localhost:5000/${product.image}`}
-                        alt={product.name}
-                        className="h-10 w-10 object-cover rounded"
-                      />
-                    )}
-                  </TableCell>
-                  <TableCell className="font-medium">{product.name}</TableCell>
-                  <TableCell>
-                    <Badge variant="outline">
-                      {product.categoryId?.name || "N/A"}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>{product.supplierId?.name || "N/A"}</TableCell>
-                  <TableCell>${product.price}</TableCell>
-                  <TableCell>
-                    <Badge
-                      variant={
-                        parseInt(product.stock) > 10 ? "default" : "destructive"
-                      }
-                    >
-                      {product.stock}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    {new Date(product.expiryDate).toLocaleDateString()}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex space-x-2">
-                      <Link to={`/products/${product._id}`}>
-                        <Button variant="outline" size="icon">
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                      </Link>
-                      <Link to={`/products/edit/${product._id}`}>
-                        <Button variant="outline" size="icon">
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                      </Link>
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        onClick={() => handleDelete(product._id!)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+          <DataTable
+            data={products}
+            columns={columns}
+            tableCaption="List of products"
+            sorting={sorting}
+            setSorting={setSorting}
+            pagination={pagination}
+            setPagination={setPagination}
+            backendPagSorting={false}
+            searchValue={searchValue}
+            onSearchChange={setSearchValue}
+            searchPlaceholder="Search products..."
+          />
           {products.length === 0 && (
             <div className="text-center py-8 text-muted-foreground">
               No products found

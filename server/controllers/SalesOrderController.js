@@ -1,14 +1,17 @@
+import CustomerModal from "../models/Customer.js";
 import ProductModal from "../models/Product.js";
 import SalesOrderModal from "../models/SalesOrder.js";
 const createSalesOrder = async (req, res) => {
     try {
-        const { productId, quantity, packageSize, customerName, paidAmount = 0 } = req.body;
+        const { productId, quantity, packageSize, customerId, paidAmount = 0 } = req.body;
 
         // Check if product exists
         const product = await ProductModal.findById(productId);
         if (!product) {
             return res.status(404).json({ success: false, message: "Product not found" });
         }
+
+        
 
         // Check if there's enough stock
         if (parseInt(product.stock) < parseInt(quantity)) {
@@ -26,7 +29,10 @@ const createSalesOrder = async (req, res) => {
         if (paidAmount > 0) {
             status = parseFloat(paidAmount) >= parseFloat(salesPrice) ? 'approved' : 'progress';
         }
-
+const customer =await CustomerModal.findById(customerId);
+if(!customer){
+    return res.status(404).json({ success: false, message: "Customer not found" });
+}
         const newSalesOrder = new SalesOrderModal({
             productId,
             productName: product.name,
@@ -35,7 +41,8 @@ const createSalesOrder = async (req, res) => {
             salesPrice,
             paidAmount: parseFloat(paidAmount),
             status,
-            customerName
+            customerId,
+            customerName: customer.name,
         });
 
         await newSalesOrder.save();

@@ -15,6 +15,8 @@ import { ArrowLeft } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import * as Yup from "yup";
+import { getCategories } from "../categories/api/categoryAPI";
+import { getSuppliers } from "../suppliers/api/supplierAPI";
 import { GetProductByID, updateProduct } from "./api/productAPI";
 import type { Product } from "./constants/product";
 
@@ -42,22 +44,30 @@ const EditProduct = () => {
   const navigate = useNavigate();
   const [product, setProduct] = useState<Product | null>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
-  const [categories] = useState([]); // You would fetch these from your API
-  const [suppliers] = useState([]); // You would fetch these from your API
+  const [categories, setCategories] = useState<any[]>([]);
+  const [suppliers, setSuppliers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (id) {
-      fetchProduct();
+      fetchData();
     }
   }, [id]);
 
-  const fetchProduct = async () => {
+  const fetchData = async () => {
     try {
-      const productData = await GetProductByID(id!);
+      setLoading(true);
+      const [productData, categoriesRes, suppliersRes] = await Promise.all([
+        GetProductByID(id!),
+        getCategories(),
+        getSuppliers(),
+      ]);
+
       setProduct(productData.product);
+      setCategories(categoriesRes.categories || categoriesRes);
+      setSuppliers(suppliersRes.suppliers || suppliersRes);
     } catch (error) {
-      console.error("Error fetching product:", error);
+      console.error("Error fetching data:", error);
     } finally {
       setLoading(false);
     }
@@ -78,7 +88,7 @@ const EditProduct = () => {
       }
 
       await updateProduct(id!, formData);
-      navigate("/products");
+      navigate("/admin/products");
     } catch (error) {
       console.error("Error updating product:", error);
     }

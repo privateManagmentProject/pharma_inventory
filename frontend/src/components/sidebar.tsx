@@ -19,7 +19,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
   const menuItems = [
     {
       name: "Dashboard",
-      path: "/admin",
+      path: "/admin/dashbourd",
       icon: <LayoutDashboard className="w-5 h-5" />,
     },
     {
