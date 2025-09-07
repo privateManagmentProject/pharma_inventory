@@ -103,7 +103,7 @@ const EditSalesOrder = () => {
                 {salesOrder.paidAmount || 0}
               </p>
               <p>
-                <strong>Balance:</strong> ${balance.toFixed(2)}
+                <strong>Un Paid Amount:</strong> ${balance.toFixed(2)}
               </p>
               <p>
                 <strong>Current Status:</strong> {salesOrder.status}

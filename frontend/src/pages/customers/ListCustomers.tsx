@@ -4,9 +4,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import type { ColumnDef, SortingState } from "@tanstack/react-table";
 import { Plus } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { getCustomers } from "./api/customerAPI";
 import type { Customer } from "./constants/customer";
-import { useCustomers } from "./constants/customer-hooks";
 import DetailCustomer from "./DetailCustomer";
 import NewCustomer from "./NewCustomer";
 import UpdateCustomer from "./UpdateCustomer";
@@ -20,8 +20,32 @@ const ListCustomers = () => {
   );
   const [sorting, setSorting] = useState<SortingState>([]);
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 10 });
+  const [searchValue, setSearchValue] = useState("");
 
-  const { data: customers, isLoading } = useCustomers();
+  const [loading, setLoading] = useState(true);
+  const [customers, setCustomers] = useState<any[]>([]);
+  useEffect(() => {
+    fetchCustomers();
+  }, [searchValue]);
+
+  const fetchCustomers = async () => {
+    try {
+      const params = new URLSearchParams();
+      if (searchValue) params.append("search", searchValue);
+      if (pagination) {
+        params.append("page", (pagination.pageIndex + 1).toString());
+        params.append("limit", pagination.pageSize.toString());
+      }
+
+      const response = await getCustomers(params.toString());
+
+      setCustomers(response.customers);
+    } catch (error) {
+      console.error("Error fetching customer:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
   const columns = useMemo<ColumnDef<any>[]>(
     () => [
       {
@@ -100,7 +124,7 @@ const ListCustomers = () => {
     []
   );
 
-  if (isLoading) return <div>Loading...</div>;
+  if (loading) return <div>Loading...</div>;
 
   return (
     <div className="p-4 md:p-6">
@@ -120,7 +144,7 @@ const ListCustomers = () => {
             tableCaption="List of categories"
           /> */}
           <DataTable
-            data={customers.customers || []}
+            data={customers || []}
             columns={columns}
             tableCaption="List of Customers"
             sorting={sorting}
@@ -128,6 +152,8 @@ const ListCustomers = () => {
             pagination={pagination}
             setPagination={setPagination}
             backendPagSorting={false}
+            searchValue={searchValue}
+            onSearchChange={setSearchValue}
             // addButton={
             //   <Button variant="outline" className="gap-1">
             //     <CloudDownload className="w-4 h-4" />

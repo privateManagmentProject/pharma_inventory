@@ -4,9 +4,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import type { ColumnDef, SortingState } from "@tanstack/react-table";
 import { Plus } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { getSuppliers } from "./api/supplierAPI";
 import type { Supplier } from "./constants/supplier";
-import { useSuppliers } from "./constants/supplier-hooks";
 import DetailSupplier from "./DetailSupplier";
 import NewSuplier from "./NewSuplier";
 import UpdateSupplier from "./UpdateSuplier";
@@ -21,7 +21,31 @@ const ListSuppliers = () => {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 10 });
 
-  const { data: suppliers, isLoading } = useSuppliers();
+  const [searchValue, setSearchValue] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [suppliers, setSuppliers] = useState<any[]>([]);
+  useEffect(() => {
+    fetchSuppliers();
+  }, [searchValue]);
+
+  const fetchSuppliers = async () => {
+    try {
+      const params = new URLSearchParams();
+      if (searchValue) params.append("search", searchValue);
+      if (pagination) {
+        params.append("page", (pagination.pageIndex + 1).toString());
+        params.append("limit", pagination.pageSize.toString());
+      }
+
+      const response = await getSuppliers(params.toString());
+
+      setSuppliers(response.suppliers);
+    } catch (error) {
+      console.error("Error fetching suppliers:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
   const columns = useMemo<ColumnDef<any>[]>(
     () => [
       {
@@ -100,12 +124,12 @@ const ListSuppliers = () => {
     []
   );
 
-  if (isLoading) return <div>Loading...</div>;
+  if (loading) return <div>Loading...</div>;
 
   return (
     <div className="p-4 md:p-6">
       <div className="flex justify-between items-center mb-4">
-        <h1 className="text-2xl font-bold">Categories</h1>
+        <h1 className="text-2xl font-bold">Suppliers</h1>
         <Button onClick={() => setIsNewDialogOpen(true)} className="gap-1">
           <Plus className="w-4 h-4" />
           Add Supplier
@@ -120,7 +144,7 @@ const ListSuppliers = () => {
             tableCaption="List of categories"
           /> */}
           <DataTable
-            data={suppliers.suppliers || []}
+            data={suppliers || []}
             columns={columns}
             tableCaption="List of Suppliers"
             sorting={sorting}
@@ -128,6 +152,8 @@ const ListSuppliers = () => {
             pagination={pagination}
             setPagination={setPagination}
             backendPagSorting={false}
+            searchValue={searchValue}
+            onSearchChange={setSearchValue}
             // addButton={
             //   <Button variant="outline" className="gap-1">
             //     <CloudDownload className="w-4 h-4" />

@@ -9,9 +9,10 @@ export const GetSupplierByID = async (id: string): Promise<Supplier> => {
     return Promise.reject(error);
   }
 };
-export const getSuppliers = async () => {
+export const getSuppliers = async (params?: string) => {
   try {
-    const response = await api.get("/supplier");
+    const url = params ? `/supplier?${params}` : "/supplier";
+    const response = await api.get(url);
     return response.data;
   } catch (error) {
     return Promise.reject(error);

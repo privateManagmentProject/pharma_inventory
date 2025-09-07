@@ -81,8 +81,15 @@ const createCustomer = async (req, res) => {
 
 const getCustomers = async(req, res) => {
   try {
-    const customers = await CustomerModal.find();
-    return res.status(200).json({ success: true, customers });
+    const {search} = req.query;
+    let filter = {};
+    if(search) {
+      filter.name = { $regex: search, $options: 'i' };
+      
+    }
+    const customers = await CustomerModal.find(filter); 
+    return res.status(200).json({ success: true, customers, total: customers.length });
+  
   } catch (error) {
     return res.status(500).json({ success: false, message: "Server error" });
   }

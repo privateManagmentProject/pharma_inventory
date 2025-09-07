@@ -156,7 +156,6 @@ const updateSalesOrder = async (req, res) => {
         return res.status(500).json({ success: false, message: "Server error" });
     }
 };
-
 const updateSalesOrderStatus = async (req, res) => {
     try {
         const { id } = req.params;
@@ -210,10 +209,10 @@ const updateSalesOrderStatus = async (req, res) => {
 };
 const getSalesOrderById = async (req, res) => {
   try {
-    const { id } = req.params;
+   const { id } = req.params;
     const salesOrder = await SalesOrderModal.findById(id)
-      .populate('productId');
-    
+      .populate('productId')
+      .populate('customerId');  
     if (!salesOrder) {
       return res.status(404).json({ success: false, message: "Sales order not found" });
     }

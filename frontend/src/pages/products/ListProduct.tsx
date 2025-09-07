@@ -13,15 +13,22 @@ import type { Product } from "./constants/product";
 const ListProduct = () => {
   const navigate = useNavigate();
   const [products, setProducts] = useState<Product[]>([]);
+  const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
   const [suppliers, setSuppliers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [sorting, setSorting] = useState<SortingState>([]);
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 10 });
   const [searchValue, setSearchValue] = useState("");
+  const [filters, setFilters] = useState<Record<string, any>>({});
+
   useEffect(() => {
     fetchProducts();
   }, [searchValue]);
+
+  useEffect(() => {
+    applyFilters();
+  }, [filters, products]);
 
   const fetchProducts = async () => {
     try {
@@ -43,6 +50,65 @@ const ListProduct = () => {
     }
   };
 
+  const applyFilters = () => {
+    let filtered = [...products];
+
+    // Apply category filter
+    if (filters.category) {
+      filtered = filtered.filter((product) =>
+        product.categoryId?.categoryName
+          ?.toLowerCase()
+          .includes(filters.category.toLowerCase())
+      );
+    }
+
+    // Apply supplier filter
+    if (filters.supplier) {
+      filtered = filtered.filter((product) =>
+        product.supplierId?.name
+          ?.toLowerCase()
+          .includes(filters.supplier.toLowerCase())
+      );
+    }
+
+    // Apply price filter
+    if (filters.minPrice) {
+      filtered = filtered.filter(
+        (product) => parseFloat(product.price) >= parseFloat(filters.minPrice)
+      );
+    }
+    if (filters.maxPrice) {
+      filtered = filtered.filter(
+        (product) => parseFloat(product.price) <= parseFloat(filters.maxPrice)
+      );
+    }
+
+    // Apply stock filter
+    if (filters.stockStatus === "low") {
+      filtered = filtered.filter((product) => parseInt(product.stock) <= 10);
+    } else if (filters.stockStatus === "out") {
+      filtered = filtered.filter((product) => parseInt(product.stock) === 0);
+    } else if (filters.stockStatus === "available") {
+      filtered = filtered.filter((product) => parseInt(product.stock) > 0);
+    }
+
+    // Apply date filter
+    if (filters.startDate) {
+      filtered = filtered.filter(
+        (product) => new Date(product.createdAt) >= new Date(filters.startDate)
+      );
+    }
+    if (filters.endDate) {
+      const endDate = new Date(filters.endDate);
+      endDate.setHours(23, 59, 59, 999);
+      filtered = filtered.filter(
+        (product) => new Date(product.createdAt) <= endDate
+      );
+    }
+
+    setFilteredProducts(filtered);
+  };
+
   const handleDelete = async (id: string) => {
     if (window.confirm("Are you sure you want to delete this product?")) {
       try {
@@ -52,6 +118,42 @@ const ListProduct = () => {
         console.error("Error deleting product:", error);
       }
     }
+  };
+
+  const filterOptions = {
+    category: {
+      type: "text" as const,
+      placeholder: "Filter by category",
+    },
+    supplier: {
+      type: "text" as const,
+      placeholder: "Filter by supplier",
+    },
+    minPrice: {
+      type: "number" as const,
+      placeholder: "Min price",
+    },
+    maxPrice: {
+      type: "number" as const,
+      placeholder: "Max price",
+    },
+    stockStatus: {
+      type: "select" as const,
+      options: [
+        { label: "Low stock (≤10)", value: "low" },
+        { label: "Out of stock", value: "out" },
+        { label: "Available", value: "available" },
+      ],
+      placeholder: "Stock status",
+    },
+    startDate: {
+      type: "date" as const,
+      placeholder: "From date",
+    },
+    endDate: {
+      type: "date" as const,
+      placeholder: "To date",
+    },
   };
 
   const columns: ColumnDef<Product>[] = [
@@ -90,7 +192,7 @@ const ListProduct = () => {
     },
     {
       header: "Category",
-      accessorKey: "categoryId.name",
+      accessorKey: "categoryId.categoryName",
       cell: ({ row }) => (
         <Badge variant="outline">
           {row.original.categoryId?.categoryName || "N/A"}
@@ -112,9 +214,7 @@ const ListProduct = () => {
       accessorKey: "stock",
       cell: ({ row }) => (
         <Badge
-          variant={
-            parseInt(row.original.stock) > 10 ? "default" : "destructive"
-          }
+          variant={parseInt(row.original.stock) > 1 ? "default" : "destructive"}
         >
           {row.original.stock}
         </Badge>
@@ -124,6 +224,11 @@ const ListProduct = () => {
       header: "Expiry Date",
       accessorKey: "expiryDate",
       cell: ({ row }) => new Date(row.original.expiryDate).toLocaleDateString(),
+    },
+    {
+      header: "Created At",
+      accessorKey: "createdAt",
+      cell: ({ row }) => new Date(row.original.createdAt).toLocaleDateString(),
     },
     {
       id: "actions",
@@ -172,7 +277,7 @@ const ListProduct = () => {
       <Card className="shadow-md bg-white dark:bg-gray-800">
         <CardContent className="p-0">
           <DataTable
-            data={products}
+            data={filteredProducts}
             columns={columns}
             tableCaption="List of products"
             sorting={sorting}
@@ -183,8 +288,11 @@ const ListProduct = () => {
             searchValue={searchValue}
             onSearchChange={setSearchValue}
             searchPlaceholder="Search products..."
+            filterOptions={filterOptions}
+            onFilterChange={setFilters}
+            activeFilters={filters}
           />
-          {products.length === 0 && (
+          {filteredProducts.length === 0 && (
             <div className="text-center py-8 text-muted-foreground">
               No products found
             </div>

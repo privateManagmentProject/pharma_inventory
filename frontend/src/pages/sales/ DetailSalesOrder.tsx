@@ -1,12 +1,13 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft } from "lucide-react";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
+import { ArrowLeft, Download } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { getSalesOrderById } from "./api/ salesOrderAPI";
 import type { SalesOrder } from "./constants/salesOrder";
-
 const DetailSalesOrder = () => {
   const { id } = useParams<{ id: string }>();
   const [salesOrder, setSalesOrder] = useState<SalesOrder | null>(null);
@@ -44,7 +45,87 @@ const DetailSalesOrder = () => {
 
   if (loading) return <div>Loading...</div>;
   if (!salesOrder) return <div>Sales order not found</div>;
+  const generatePDF = () => {
+    if (!salesOrder) return;
 
+    const doc = new jsPDF();
+
+    // Add header
+    doc.setFontSize(20);
+    doc.setFont("helvetica", "bold");
+    doc.text("Sales Order Details", 20, 20);
+
+    // Add company info (placeholder for logo)
+    doc.setFontSize(12);
+    doc.setFont("helvetica", "normal");
+    doc.text("Your Company Name", 20, 30);
+    doc.text("123 Business St, City, Country", 20, 36);
+    doc.text("Email: info@company.com", 20, 42);
+
+    // Add order info
+    doc.setFontSize(12);
+    doc.text(`Order ID: ${salesOrder._id?.slice(-6)}`, 20, 60);
+    doc.text(
+      `Created: ${new Date(salesOrder.createdAt).toLocaleDateString()}`,
+      20,
+      68
+    );
+
+    // Order Information Table
+    autoTable(doc, {
+      startY: 80,
+      head: [["Field", "Details"]],
+      body: [
+        ["Customer Name", salesOrder.customerName],
+        ["Product", salesOrder.productId.name],
+        ["Quantity", `${salesOrder.quantity} ${salesOrder.packageSize}`],
+      ],
+      theme: "grid",
+      headStyles: {
+        fillColor: [22, 160, 133],
+        textColor: [255, 255, 255],
+        fontSize: 12,
+      },
+      bodyStyles: { fontSize: 10 },
+      margin: { left: 20, right: 20 },
+    });
+
+    // Payment Information Table
+    const balance =
+      parseFloat(salesOrder.salesPrice) - (salesOrder.paidAmount || 0);
+    autoTable(doc, {
+      startY: (doc as any).lastAutoTable.finalY + 20,
+      head: [["Field", "Details"]],
+      body: [
+        ["Total Price", `$${salesOrder.salesPrice}`],
+        ["Paid Amount", `$${salesOrder.paidAmount || 0}`],
+        ["Unpaid Amount", `$${balance.toFixed(2)}`],
+        ["Status", salesOrder.status],
+      ],
+      theme: "grid",
+      headStyles: {
+        fillColor: [22, 160, 133],
+        textColor: [255, 255, 255],
+        fontSize: 12,
+      },
+      bodyStyles: { fontSize: 10 },
+      margin: { left: 20, right: 20 },
+    });
+
+    // Add footer
+    const pageCount = doc.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++) {
+      doc.setPage(i);
+      doc.setFontSize(8);
+      doc.text(
+        `Page ${i} of ${pageCount}`,
+        20,
+        doc.internal.pageSize.height - 10
+      );
+    }
+
+    doc.save(`sales_order_${salesOrder._id?.slice(-6)}.pdf`);
+  };
   const balance =
     parseFloat(salesOrder.salesPrice) - (salesOrder.paidAmount || 0);
 
@@ -56,6 +137,9 @@ const DetailSalesOrder = () => {
             <ArrowLeft className="mr-2 h-4 w-4" /> Back to Sales Orders
           </Button>
         </Link>
+        <Button variant="outline" onClick={generatePDF}>
+          <Download className="mr-2 h-4 w-4" /> Download PDF
+        </Button>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -74,7 +158,7 @@ const DetailSalesOrder = () => {
             </div>
             <div>
               <h3 className="font-semibold">Product</h3>
-              <p>{salesOrder.productName}</p>
+              <p>{salesOrder.productId.name}</p>
             </div>
             <div>
               <h3 className="font-semibold">Quantity</h3>
@@ -103,7 +187,7 @@ const DetailSalesOrder = () => {
               <p>${salesOrder.paidAmount || 0}</p>
             </div>
             <div>
-              <h3 className="font-semibold">Balance</h3>
+              <h3 className="font-semibold">Un paid Amount</h3>
               <p>${balance.toFixed(2)}</p>
             </div>
             <div>

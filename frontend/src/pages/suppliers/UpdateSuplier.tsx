@@ -19,7 +19,6 @@ const validationSchema = Yup.object({
   phone: Yup.string().required("Phone number is required"),
   address: Yup.string().required("Address is required"),
   tinNumber: Yup.string().required("TIN number is required"),
-  licenses: Yup.array().of(Yup.string()),
   account: Yup.object({
     name: Yup.string().required("Account name is required"),
     number: Yup.string().required("Account number is required"),

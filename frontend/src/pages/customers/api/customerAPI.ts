@@ -8,9 +8,10 @@ export const GetCustomerByID = async (id: string): Promise<Customer> => {
     return Promise.reject(error);
   }
 };
-export const getCustomers = async () => {
+export const getCustomers = async (params?: string) => {
   try {
-    const response = await api.get("/customer");
+    const url = params ? `/customer?${params}` : "/customer";
+    const response = await api.get(url);
     return response.data;
   } catch (error) {
     return Promise.reject(error);

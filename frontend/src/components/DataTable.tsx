@@ -21,7 +21,9 @@ import {
   ChevronRight,
   ChevronsLeft,
   ChevronsRight,
+  Filter,
   Search,
+  X,
 } from "lucide-react";
 import * as React from "react";
 
@@ -42,7 +44,9 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useEffect, type Dispatch, type SetStateAction } from "react";
+import { Badge } from "./ui/badge";
 import { Input } from "./ui/input";
+import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 
 function useMediaQuery(query: string): boolean {
   const [matches, setMatches] = React.useState(false);
@@ -83,6 +87,16 @@ export interface DataTableProps<Data extends object> {
   searchValue?: string;
   onSearchChange?: (value: string) => void;
   filters?: React.ReactNode;
+  // New props for advanced filtering
+  filterOptions?: {
+    [key: string]: {
+      type: "text" | "select" | "date" | "number" | "boolean";
+      options?: { label: string; value: string }[];
+      placeholder?: string;
+    };
+  };
+  onFilterChange?: (filters: Record<string, any>) => void;
+  activeFilters?: Record<string, any>;
 }
 
 export function DataTable<Data extends object>({
@@ -103,10 +117,15 @@ export function DataTable<Data extends object>({
   searchValue,
   onSearchChange,
   filters,
+  filterOptions = {},
+  onFilterChange,
+  activeFilters = {},
 }: DataTableProps<Data>) {
   const [rowSelection, setRowSelection] = React.useState({});
   const [columnVisibility, setColumnVisibility] =
     React.useState<VisibilityState>(initialColumnVisibility || {});
+  const [localFilters, setLocalFilters] =
+    React.useState<Record<string, any>>(activeFilters);
   const isMobile = useMediaQuery("(max-width: 768px)");
 
   useEffect(() => {
@@ -117,6 +136,28 @@ export function DataTable<Data extends object>({
       setColumnVisibility(initialColumnVisibility || {});
     }
   }, [isMobile, columns, initialColumnVisibility]);
+
+  // useEffect(() => {
+  //   setLocalFilters(activeFilters);
+  // }, [activeFilters]);
+
+  const handleFilterChange = (key: string, value: any) => {
+    const newFilters = { ...localFilters, [key]: value };
+    setLocalFilters(newFilters);
+    onFilterChange?.(newFilters);
+  };
+
+  const removeFilter = (key: string) => {
+    const newFilters = { ...localFilters };
+    delete newFilters[key];
+    setLocalFilters(newFilters);
+    onFilterChange?.(newFilters);
+  };
+
+  const clearAllFilters = () => {
+    setLocalFilters({});
+    onFilterChange?.({});
+  };
 
   const table = useReactTable({
     data,
@@ -163,6 +204,130 @@ export function DataTable<Data extends object>({
                 onChange={(e) => onSearchChange(e.target.value)}
                 className="pl-8 w-full sm:w-[250px]"
               />
+            </div>
+          )}
+
+          {/* Advanced Filters */}
+          {Object.keys(filterOptions).length > 0 && (
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" className="flex items-center gap-2">
+                  <Filter className="h-4 w-4" />
+                  Filters
+                  {Object.keys(localFilters).length > 0 && (
+                    <Badge variant="secondary" className="ml-1">
+                      {Object.keys(localFilters).length}
+                    </Badge>
+                  )}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-80 p-4">
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h4 className="font-medium">Filters</h4>
+                    {Object.keys(localFilters).length > 0 && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={clearAllFilters}
+                        className="h-8 px-2"
+                      >
+                        Clear all
+                      </Button>
+                    )}
+                  </div>
+
+                  {Object.entries(filterOptions).map(([key, option]) => (
+                    <div key={key} className="space-y-2">
+                      <label className="text-sm font-medium capitalize">
+                        {key.replace(/([A-Z])/g, " $1").toLowerCase()}
+                      </label>
+                      {option.type === "select" && option.options ? (
+                        <Select
+                          value={localFilters[key] || ""}
+                          onValueChange={(value) =>
+                            handleFilterChange(key, value)
+                          }
+                        >
+                          <SelectTrigger>
+                            <SelectValue
+                              placeholder={
+                                option.placeholder || `Select ${key}`
+                              }
+                            />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {option.options.map((opt) => (
+                              <SelectItem key={opt.value} value={opt.value}>
+                                {opt.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      ) : option.type === "date" ? (
+                        <Input
+                          type="date"
+                          value={localFilters[key] || ""}
+                          onChange={(e) =>
+                            handleFilterChange(key, e.target.value)
+                          }
+                          placeholder={option.placeholder}
+                        />
+                      ) : option.type === "boolean" ? (
+                        <Select
+                          value={localFilters[key] || ""}
+                          onValueChange={(value) =>
+                            handleFilterChange(key, value)
+                          }
+                        >
+                          <SelectTrigger>
+                            <SelectValue
+                              placeholder={
+                                option.placeholder || `Select ${key}`
+                              }
+                            />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="true">Yes</SelectItem>
+                            <SelectItem value="false">No</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        <Input
+                          type={option.type === "number" ? "number" : "text"}
+                          value={localFilters[key] || ""}
+                          onChange={(e) =>
+                            handleFilterChange(key, e.target.value)
+                          }
+                          placeholder={option.placeholder}
+                        />
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </PopoverContent>
+            </Popover>
+          )}
+
+          {/* Active Filters */}
+          {Object.keys(localFilters).length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {Object.entries(localFilters).map(([key, value]) => (
+                <Badge
+                  key={key}
+                  variant="secondary"
+                  className="flex items-center gap-1"
+                >
+                  <span className="capitalize">
+                    {key.replace(/([A-Z])/g, " $1").toLowerCase()}:
+                  </span>
+                  <span>{String(value)}</span>
+                  <X
+                    className="h-3 w-3 cursor-pointer"
+                    onClick={() => removeFilter(key)}
+                  />
+                </Badge>
+              ))}
             </div>
           )}
 

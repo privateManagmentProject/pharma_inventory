@@ -4,11 +4,11 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import type { ColumnDef, SortingState } from "@tanstack/react-table";
 import { Plus } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import DetailCategory from "./DetailCategory";
 import NewCategory from "./NewCategory";
 import UpdateCategory from "./UpdateCategory";
-import { useCategories } from "./constants/category-hooks";
+import { getCategories } from "./api/categoryAPI";
 import type { Category } from "./constants/catgory";
 
 const ListCategory = () => {
@@ -20,9 +20,32 @@ const ListCategory = () => {
   );
   const [sorting, setSorting] = useState<SortingState>([]);
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 10 });
+  const [searchValue, setSearchValue] = useState("");
 
-  const { data: categories, isLoading } = useCategories();
-  console.log("data", categories);
+  const [loading, setLoading] = useState(true);
+  const [categories, setCategories] = useState<any[]>([]);
+  useEffect(() => {
+    fetchCatagories();
+  }, [searchValue]);
+
+  const fetchCatagories = async () => {
+    try {
+      const params = new URLSearchParams();
+      if (searchValue) params.append("search", searchValue);
+      if (pagination) {
+        params.append("page", (pagination.pageIndex + 1).toString());
+        params.append("limit", pagination.pageSize.toString());
+      }
+
+      const response = await getCategories(params.toString());
+
+      setCategories(response.categories);
+    } catch (error) {
+      console.error("Error fetching catagories:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
   const columns = useMemo<ColumnDef<any>[]>(
     () => [
       {
@@ -91,8 +114,7 @@ const ListCategory = () => {
     []
   );
 
-  if (isLoading) return <div>Loading...</div>;
-
+  if (loading) return <div>Loading...</div>;
   return (
     <div className="p-4 md:p-6">
       <div className="flex justify-between items-center mb-4">
@@ -105,13 +127,8 @@ const ListCategory = () => {
 
       <Card className="shadow-md bg-white dark:bg-gray-800">
         <CardContent className="pt-6">
-          {/* <DataTable
-            data={categories || []}
-            columns={columns}
-            tableCaption="List of categories"
-          /> */}
           <DataTable
-            data={categories.categories || []}
+            data={categories || []}
             columns={columns}
             tableCaption="List of categories"
             sorting={sorting}
@@ -119,6 +136,9 @@ const ListCategory = () => {
             pagination={pagination}
             setPagination={setPagination}
             backendPagSorting={false}
+            searchValue={searchValue}
+            onSearchChange={setSearchValue}
+            searchPlaceholder="Search Categories..."
             // addButton={
             //   <Button variant="outline" className="gap-1">
             //     <CloudDownload className="w-4 h-4" />

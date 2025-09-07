@@ -7,6 +7,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Field, Form, Formik, type FormikHelpers } from "formik";
 import { useState } from "react";
@@ -54,6 +55,8 @@ const NewCustomer: React.FC<NewCustomerProps> = ({ open, onOpenChange }) => {
       formData.append("receiverName", values.receiverInfo.name);
       formData.append("receiverPhone", values.receiverInfo.phone);
       formData.append("receiverAddress", values.receiverInfo.address);
+      formData.append("companyName", values.companyName);
+      formData.append("withhold", String(values.withhold));
 
       // Append license files
       licenseFiles.forEach((file) => {
@@ -205,7 +208,7 @@ const NewCustomer: React.FC<NewCustomerProps> = ({ open, onOpenChange }) => {
               </div>
 
               <div>
-                <Label htmlFor="receiverName">Receiver Info</Label>
+                <Label htmlFor="receiverName">Receiver Name</Label>
                 <Field
                   as={Input}
                   id="receiverName"
@@ -247,6 +250,13 @@ const NewCustomer: React.FC<NewCustomerProps> = ({ open, onOpenChange }) => {
                       {errors.receiverInfo.address}
                     </div>
                   )}
+              </div>
+              <div>
+                <Label htmlFor="withhold">Withhold</Label>
+                <Switch id="withhold" name="withhold" />
+                {errors.withhold && touched.withhold && (
+                  <div className="text-red-500 text-sm">{errors.withhold}</div>
+                )}
               </div>
               <div className="flex justify-end space-x-2 pt-4">
                 <Button

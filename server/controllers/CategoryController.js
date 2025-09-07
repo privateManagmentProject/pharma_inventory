@@ -20,8 +20,13 @@ const createCategory = async (req, res) => {
 
 const getCategories = async(req, res) =>{
     try {
-        const categories= await CategoryModel.find();
-        return  res.status(200).json({ success: true, categories})
+        const {search} = req.query;
+        let filter = {};
+        if(search) {
+            filter.categoryName = { $regex: search, $options: 'i' };
+        }
+        const categories= await CategoryModel.find(filter);
+        return  res.status(200).json({ success: true, categories, total: categories.length})
     } catch (error) {
         return res.status(500).json({ success: false, message: "Server error"})
     }

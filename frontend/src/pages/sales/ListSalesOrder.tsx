@@ -3,12 +3,13 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import type { ColumnDef, SortingState } from "@tanstack/react-table";
-import { Edit, Eye, Plus, Trash2 } from "lucide-react";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
+import { Download, Edit, Eye, Plus } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { deleteSalesOrder, getSalesOrders } from "./api/ salesOrderAPI";
 import type { SalesOrder } from "./constants/salesOrder";
-
 const ListSalesOrder = () => {
   const navigate = useNavigate();
   const [salesOrders, setSalesOrders] = useState<SalesOrder[]>([]);
@@ -64,7 +65,85 @@ const ListSalesOrder = () => {
         return "bg-yellow-100 text-yellow-800";
     }
   };
+  const generatePDF = (order: SalesOrder) => {
+    const doc = new jsPDF();
 
+    // Add header
+    doc.setFontSize(20);
+    doc.setFont("helvetica", "bold");
+    doc.text("Sales Order Details", 20, 20);
+
+    // Add company info (placeholder for logo)
+    doc.setFontSize(12);
+    doc.setFont("helvetica", "normal");
+    doc.text("Your Company Name", 20, 30);
+    doc.text("123 Business St, City, Country", 20, 36);
+    doc.text("Email: info@company.com", 20, 42);
+
+    // Add order info
+    doc.setFontSize(12);
+    doc.text(`Order ID: ${order._id?.slice(-6)}`, 20, 60);
+    doc.text(
+      `Created: ${new Date(order.createdAt).toLocaleDateString()}`,
+      20,
+      68
+    );
+
+    // Order Information Table
+    autoTable(doc, {
+      startY: 80,
+      head: [["Field", "Details"]],
+      body: [
+        ["Customer Name", order.customerName],
+        ["Product", order.productId.name],
+
+        ["Quantity", `${order.quantity} ${order.packageSize}`],
+      ],
+      theme: "grid",
+      headStyles: {
+        fillColor: [22, 160, 133],
+        textColor: [255, 255, 255],
+        fontSize: 12,
+      },
+      bodyStyles: { fontSize: 10 },
+      margin: { left: 20, right: 20 },
+    });
+
+    // Payment Information Table
+    const balance = parseFloat(order.salesPrice) - (order.paidAmount || 0);
+    autoTable(doc, {
+      startY: (doc as any).lastAutoTable.finalY + 20,
+      head: [["Field", "Details"]],
+      body: [
+        ["Total Price", `$${order.salesPrice}`],
+        ["Paid Amount", `$${order.paidAmount || 0}`],
+        ["Unpaid Amount", `$${balance.toFixed(2)}`],
+        ["Status", order.status],
+      ],
+      theme: "grid",
+      headStyles: {
+        fillColor: [22, 160, 133],
+        textColor: [255, 255, 255],
+        fontSize: 12,
+      },
+      bodyStyles: { fontSize: 10 },
+      margin: { left: 20, right: 20 },
+    });
+
+    // Add footer
+    const pageCount = doc.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++) {
+      doc.setPage(i);
+      doc.setFontSize(8);
+      doc.text(
+        `Page ${i} of ${pageCount}`,
+        20,
+        doc.internal.pageSize.height - 10
+      );
+    }
+
+    doc.save(`sales_order_${order._id?.slice(-6)}.pdf`);
+  };
   const columns: ColumnDef<SalesOrder>[] = [
     {
       header: "Customer Name",
@@ -135,9 +214,9 @@ const ListSalesOrder = () => {
             <Button
               variant="outline"
               size="icon"
-              onClick={() => handleDelete(order._id!)}
+              onClick={() => generatePDF(order)}
             >
-              <Trash2 className="h-4 w-4" />
+              <Download className="h-4 w-4" />
             </Button>
           </div>
         );

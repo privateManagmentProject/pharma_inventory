@@ -15,7 +15,8 @@ import mongoose from "mongoose";
   enum: ['kg', 'box', 'bottle', 'pack', 'unit'] // Add your desired package types
 },
     categoryId: {type: mongoose.Schema.Types.ObjectId, ref: "Category", require: true},
-    supplierId: {type: mongoose.Schema.Types.ObjectId, ref: "Supplier", require: true}
+    supplierId: {type: mongoose.Schema.Types.ObjectId, ref: "Supplier", require: true},
+       createdAt: { type: Date, default: Date.now } 
    
  });
 

@@ -9,9 +9,10 @@ export const GetCategoryByID = async (id: string): Promise<Category> => {
     return Promise.reject(error);
   }
 };
-export const getCategories = async () => {
+export const getCategories = async (params?: string) => {
   try {
-    const response = await api.get("/category");
+    const url = params ? `/category?${params}` : "/category";
+    const response = await api.get(url);
     return response.data;
   } catch (error) {
     return Promise.reject(error);

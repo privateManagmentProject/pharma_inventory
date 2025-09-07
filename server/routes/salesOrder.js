@@ -6,7 +6,7 @@ const router = express.Router();
 router.post("/add", authMiddleware, createSalesOrder);
 router.get("/", authMiddleware, getSalesOrders);
 router.put("/:id",authMiddleware, updateSalesOrder); // Add this line for general updates
-router.get("/", authMiddleware, getSalesOrderById);
+router.get("/:id", authMiddleware, getSalesOrderById);
 router.put("/:id/status", updateSalesOrderStatus); 
 
 export default router;

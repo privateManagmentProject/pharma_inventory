@@ -68,8 +68,14 @@ const createSupplier = async (req, res) => {
 
 const getSuppliers = async(req, res) => {
   try {
-    const suppliers = await SupplierModal.find();
-    return res.status(200).json({ success: true, suppliers });
+    const {search} = req.query;
+    let filter = {};
+    if(search) {
+      filter.name = { $regex: search, $options: 'i' };
+    }
+    const suppliers = await SupplierModal.find(filter);
+    return res.status(200).json({ success: true, suppliers, total: suppliers.length });
+    
   } catch (error) {
     return res.status(500).json({ success: false, message: "Server error" });
   }
