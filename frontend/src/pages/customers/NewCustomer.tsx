@@ -24,6 +24,7 @@ const validationSchema = Yup.object({
   address: Yup.string().required("Address is required"),
   companyName: Yup.string().required("companyName is required"),
   tinNumber: Yup.string().required("TIN number is required"),
+  description: Yup.string(),
   receiverInfo: Yup.object({
     name: Yup.string().required("Account name is required"),
     phone: Yup.string().required("Phone number is required"),
@@ -56,6 +57,7 @@ const NewCustomer: React.FC<NewCustomerProps> = ({ open, onOpenChange }) => {
       formData.append("receiverPhone", values.receiverInfo.phone);
       formData.append("receiverAddress", values.receiverInfo.address);
       formData.append("companyName", values.companyName);
+      formData.append("description", values.description || "");
       formData.append("withhold", String(values.withhold));
 
       // Append license files
@@ -88,6 +90,7 @@ const NewCustomer: React.FC<NewCustomerProps> = ({ open, onOpenChange }) => {
             companyName: "",
             phone: "",
             address: "",
+            description: "",
             tinNumber: "",
             receiverInfo: {
               name: "",
@@ -152,6 +155,16 @@ const NewCustomer: React.FC<NewCustomerProps> = ({ open, onOpenChange }) => {
                 {errors.address && touched.address && (
                   <div className="text-red-500 text-sm">{errors.address}</div>
                 )}
+              </div>
+              <div>
+                <Label htmlFor="description">Description</Label>
+                <Field
+                  as={Textarea}
+                  id="description"
+                  name="description"
+                  placeholder="Enter supplier description"
+                  rows={2}
+                />
               </div>
               <div>
                 <Label htmlFor="address">Company Name</Label>

@@ -17,17 +17,21 @@ import * as Yup from "yup";
 import { getSalesOrderById, updateSalesOrder } from "./api/ salesOrderAPI";
 import type { SalesOrder } from "./constants/salesOrder";
 
-const validationSchema = Yup.object({
-  paidAmount: Yup.number().min(0, "Paid amount cannot be negative"),
-  status: Yup.string().required("Status is required"),
-});
-
 const EditSalesOrder = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [salesOrder, setSalesOrder] = useState<SalesOrder | null>(null);
   const [loading, setLoading] = useState(true);
-
+  const getValidationSchema = () => {
+    const balance =
+      parseFloat(salesOrder.salesPrice) - (salesOrder.paidAmount || 0);
+    return Yup.object({
+      paidAmount: Yup.number()
+        .min(0, "Paid amount cannot be negative")
+        .max(balance, "Cannot pay more than the unpaid amount"),
+      status: Yup.string().required("Status is required"),
+    });
+  };
   useEffect(() => {
     if (id) {
       fetchSalesOrder();
@@ -113,10 +117,10 @@ const EditSalesOrder = () => {
 
           <Formik
             initialValues={{
-              paidAmount: salesOrder.paidAmount?.toString() || "0",
+              paidAmount: "0", // Start from 0 for additional payment
               status: salesOrder.status,
             }}
-            validationSchema={validationSchema}
+            validationSchema={getValidationSchema()}
             onSubmit={handleSubmit}
           >
             {({ isSubmitting, errors, touched, setFieldValue, values }) => (
@@ -170,13 +174,19 @@ const EditSalesOrder = () => {
                 <div className="bg-muted p-4 rounded-md">
                   <h4 className="font-semibold mb-2">Payment Summary</h4>
                   <p>Total Price: ${salesOrder.salesPrice}</p>
-                  <p>New Paid Amount: ${values.paidAmount}</p>
+                  <p>New Paid Amount: ${parseFloat(values.paidAmount)}</p>
                   <p>
-                    New Balance: $
+                    New Paid Amount: $
                     {(
-                      parseFloat(salesOrder.salesPrice) -
+                      salesOrder.paidAmount +
                       parseFloat(values.paidAmount || "0")
                     ).toFixed(2)}
+                  </p>
+                  <p>
+                    New Balance: $
+                    {(balance - parseFloat(values.paidAmount || "0")).toFixed(
+                      2
+                    )}
                   </p>
                   <p className="mt-2 text-sm">
                     Note: Setting status to "Approved" will automatically update

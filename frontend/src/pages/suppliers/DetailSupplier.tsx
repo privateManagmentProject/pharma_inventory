@@ -20,7 +20,7 @@ const DetailSupplier: React.FC<DetailSupplierProps> = ({
 }) => {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>Supplier Details</DialogTitle>
         </DialogHeader>
@@ -44,6 +44,12 @@ const DetailSupplier: React.FC<DetailSupplierProps> = ({
             </p>
           </div>
           <div>
+            <h3 className="font-semibold">Description</h3>
+            <p className="text-gray-700 dark:text-gray-300">
+              {supplier.description || "No description provided"}
+            </p>
+          </div>
+          <div>
             <h3 className="font-semibold">TIN Number</h3>
             <p className="text-gray-700 dark:text-gray-300">
               {supplier.tinNumber}
@@ -52,31 +58,43 @@ const DetailSupplier: React.FC<DetailSupplierProps> = ({
           <div>
             <h3 className="font-semibold">Licenses</h3>
             <div className="text-gray-700 dark:text-gray-300">
-              {supplier.licenses.map((license, index) => (
-                <a
-                  key={index}
-                  href={`http://localhost:5000/${license.path}`} // Adjust URL as needed
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="block text-blue-600 hover:underline"
-                >
-                  {license.name} ({license.type})
-                </a>
-              ))}
+              {supplier.licenses && supplier.licenses.length > 0 ? (
+                supplier.licenses.map((license, index) => (
+                  <a
+                    key={index}
+                    href={`http://localhost:5000/${license.path}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block text-blue-600 hover:underline"
+                  >
+                    {license.name} ({license.type})
+                  </a>
+                ))
+              ) : (
+                <p>No licenses uploaded</p>
+              )}
             </div>
           </div>
-
           <div>
-            <h3 className="font-semibold">Account Name</h3>
-            <p className="text-gray-700 dark:text-gray-300">
-              {supplier.account.name}
-            </p>
-          </div>
-          <div>
-            <h3 className="font-semibold">Account Number</h3>
-            <p className="text-gray-700 dark:text-gray-300">
-              {supplier.account.number}
-            </p>
+            <h3 className="font-semibold">Accounts</h3>
+            <div className="text-gray-700 dark:text-gray-300">
+              {supplier.accounts && supplier.accounts.length > 0 ? (
+                supplier.accounts.map((account, index) => (
+                  <div key={index} className="mb-2">
+                    <p>
+                      {account.name} - {account.number}
+                      {account.isDefault && (
+                        <span className="ml-2 text-xs bg-green-100 text-green-800 px-2 py-1 rounded">
+                          Default
+                        </span>
+                      )}
+                    </p>
+                  </div>
+                ))
+              ) : (
+                <p>No accounts added</p>
+              )}
+            </div>
           </div>
           <div className="flex justify-end pt-4">
             <Button variant="outline" onClick={() => onOpenChange(false)}>

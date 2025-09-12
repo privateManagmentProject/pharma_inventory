@@ -22,6 +22,7 @@ const upload = multer({
     }
   }
 }).array('licenses', 5);
+
 const createSupplier = async (req, res) => {
   try {
     upload(req, res, async function (err) {
@@ -29,7 +30,7 @@ const createSupplier = async (req, res) => {
         return res.status(400).json({ success: false, message: err.message });
       }
 
-      const { name, email, phone, address, tinNumber, accountName, accountNumber } = req.body;
+      const { name, email, phone, address, description, tinNumber, accounts } = req.body;
       
       const existingSupplier = await SupplierModal.findOne({ 
         $or: [{ email }, { tinNumber }] 
@@ -45,17 +46,29 @@ const createSupplier = async (req, res) => {
         path: file.path,
         type: file.mimetype
       })) : [];
+      
+      // Parse accounts JSON
+      let parsedAccounts = [];
+      try {
+        parsedAccounts = accounts ? JSON.parse(accounts) : [];
+      } catch (error) {
+        return res.status(400).json({ success: false, message: "Invalid accounts format" });
+      }
+
+      // Ensure at least one account is default
+      if (parsedAccounts.length > 0 && !parsedAccounts.some(acc => acc.isDefault)) {
+        parsedAccounts[0].isDefault = true;
+      }
+
       const newSupplier = new SupplierModal({
         name, 
         email, 
         phone, 
         address,
+        description: description || "",
         tinNumber,
         licenses,
-        account: {
-          name: accountName,
-          number: accountNumber
-        }
+        accounts: parsedAccounts
       });
       
       await newSupplier.save();
@@ -89,7 +102,7 @@ const updateSupplier = async (req, res) => {
       }
 
       const { id } = req.params;
-      const { name, email, phone, address, tinNumber, accountName, accountNumber } = req.body;
+      const { name, email, phone, address, description, tinNumber, accounts } = req.body;
       
       const existingSupplier = await SupplierModal.findById(id);
       if (!existingSupplier) {
@@ -108,9 +121,27 @@ const updateSupplier = async (req, res) => {
         return res.status(400).json({ success: false, message: "Email or TIN number already exists" });
       }
 
-      // Get file paths
-      const newLicenses = req.files ? req.files.map(file => file.path) : [];
+      // Process uploaded files
+      const newLicenses = req.files ? req.files.map(file => ({
+        name: file.originalname,
+        path: file.path,
+        type: file.mimetype
+      })) : [];
+      
       const allLicenses = [...existingSupplier.licenses, ...newLicenses];
+
+      // Parse accounts JSON
+      let parsedAccounts = [];
+      try {
+        parsedAccounts = accounts ? JSON.parse(accounts) : existingSupplier.accounts;
+      } catch (error) {
+        return res.status(400).json({ success: false, message: "Invalid accounts format" });
+      }
+
+      // Ensure at least one account is default
+      if (parsedAccounts.length > 0 && !parsedAccounts.some(acc => acc.isDefault)) {
+        parsedAccounts[0].isDefault = true;
+      }
 
       const updatedSupplier = await SupplierModal.findByIdAndUpdate(
         id, 
@@ -119,12 +150,10 @@ const updateSupplier = async (req, res) => {
           email,
           phone,
           address,
+          description: description || "",
           tinNumber,
           licenses: allLicenses,
-          account: {
-            name: accountName,
-            number: accountNumber
-          }
+          accounts: parsedAccounts
         },
         { new: true }
       );
@@ -135,6 +164,7 @@ const updateSupplier = async (req, res) => {
     return res.status(500).json({ success: false, message: "Server error" });
   }
 };
+
 const getSupplierById = async (req, res) => {
   try {
     const { id } = req.params;
@@ -149,6 +179,7 @@ const getSupplierById = async (req, res) => {
     return res.status(500).json({ success: false, message: "Server error" });
   }
 };
+
 const deleteSupplier = async (req, res) => {
   try {
     const { id } = req.params;
@@ -165,4 +196,3 @@ const deleteSupplier = async (req, res) => {
 };
 
 export { createSupplier, deleteSupplier, getSupplierById, getSuppliers, updateSupplier };
-

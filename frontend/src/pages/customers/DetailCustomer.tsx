@@ -44,6 +44,12 @@ const DetailCustomer: React.FC<DetailCustomerProps> = ({
             </p>
           </div>
           <div>
+            <h3 className="font-semibold">Description</h3>
+            <p className="text-gray-700 dark:text-gray-300">
+              {customer.description || "No description provided"}
+            </p>
+          </div>
+          <div>
             <h3 className="font-semibold">TIN Number</h3>
             <p className="text-gray-700 dark:text-gray-300">
               {customer.tinNumber}

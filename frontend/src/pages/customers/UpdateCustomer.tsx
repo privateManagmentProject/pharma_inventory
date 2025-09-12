@@ -21,6 +21,7 @@ const validationSchema = Yup.object({
   phone: Yup.string().required("Phone number is required"),
   address: Yup.string().required("Address is required"),
   tinNumber: Yup.string().required("TIN number is required"),
+  description: Yup.string(),
   account: Yup.object({
     name: Yup.string().required("Account name is required"),
     number: Yup.string().required("Account number is required"),
@@ -69,6 +70,7 @@ const UpdateCustomer: React.FC<UpdateCustomerProps> = ({
             tinNumber: customer.tinNumber,
             licenses: customer.licenses,
             receiverInfo: customer.receiverInfo,
+            description: customer.description || "",
           }}
           validationSchema={validationSchema}
           onSubmit={handleSubmit}
@@ -128,6 +130,16 @@ const UpdateCustomer: React.FC<UpdateCustomerProps> = ({
                 {errors.address && touched.address && (
                   <div className="text-red-500 text-sm">{errors.address}</div>
                 )}
+              </div>
+              <div>
+                <Label htmlFor="description">Description</Label>
+                <Field
+                  as={Textarea}
+                  id="description"
+                  name="description"
+                  placeholder="Enter supplier description"
+                  rows={2}
+                />
               </div>
 
               <div>

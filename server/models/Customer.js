@@ -10,6 +10,7 @@ const CustomerSchema = new mongoose.Schema({
     companyName: { type: String, required: true },
     tinNumber: { type: String, required: true },
     phone: { type: String, required: true },
+    description: { type: String, default: "" },
     licenses: [LicenseSchema], // Changed to array of objects
     receiverInfo: {
         name: { type: String, required: true },

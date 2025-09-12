@@ -13,6 +13,7 @@ export interface Customer {
   address: string;
   tinNumber: string;
   licenses: LicenseFile[];
+  description: string;
   receiverInfo: {
     name: string;
     phone: string;

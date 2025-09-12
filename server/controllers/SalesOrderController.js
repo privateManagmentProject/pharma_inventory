@@ -97,18 +97,20 @@ const updateSalesOrder = async (req, res) => {
         const oldStatus = salesOrder.status;
         
         // Update paid amount if provided
-        if (paidAmount !== undefined) {
-            salesOrder.paidAmount = parseFloat(paidAmount);
-            
-            // Auto-update status based on payment
-            if (salesOrder.paidAmount >= parseFloat(salesOrder.salesPrice)) {
-                salesOrder.status = 'approved';
-            } else if (salesOrder.paidAmount > 0) {
-                salesOrder.status = 'progress';
-            } else {
-                salesOrder.status = 'pending';
-            }
-        }
+      if (paidAmount !== undefined) {
+    const additionalAmount = parseFloat(paidAmount);
+    salesOrder.paidAmount += additionalAmount;
+    
+    // Auto-update status based on payment
+    if (salesOrder.paidAmount >= parseFloat(salesOrder.salesPrice)) {
+        salesOrder.status = 'approved';
+    } else if (salesOrder.paidAmount > 0) {
+        salesOrder.status = 'progress';
+    } else {
+        salesOrder.status = 'pending';
+    }
+}
+
 
         // Manual status override if provided
         if (status) {

@@ -36,6 +36,7 @@ const createCustomer = async (req, res) => {
         companyName, 
         tinNumber, 
         phone, 
+        description,
         receiverName,
         receiverPhone,
         receiverAddress,
@@ -63,6 +64,7 @@ const createCustomer = async (req, res) => {
         tinNumber, 
         phone,
         licenses,
+         description: description || "",
         receiverInfo: {
           name: receiverName,
           phone: receiverPhone,
