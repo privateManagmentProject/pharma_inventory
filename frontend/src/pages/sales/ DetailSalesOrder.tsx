@@ -1,3 +1,4 @@
+// Updated DetailSalesOrder.tsx
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,6 +9,7 @@ import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { getSalesOrderById } from "./api/ salesOrderAPI";
 import type { SalesOrder } from "./constants/salesOrder";
+
 const DetailSalesOrder = () => {
   const { id } = useParams<{ id: string }>();
   const [salesOrder, setSalesOrder] = useState<SalesOrder | null>(null);
@@ -38,13 +40,37 @@ const DetailSalesOrder = () => {
         return "bg-red-100 text-red-800";
       case "progress":
         return "bg-blue-100 text-blue-800";
+      case "completed":
+        return "bg-purple-100 text-purple-800";
       default:
         return "bg-yellow-100 text-yellow-800";
     }
   };
 
-  if (loading) return <div>Loading...</div>;
-  if (!salesOrder) return <div>Sales order not found</div>;
+  const getPaymentStatus = (order: SalesOrder) => {
+    const today = new Date();
+    const dueDate = new Date(order.paymentInfo.dueDate);
+    const daysRemaining = Math.ceil(
+      (dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)
+    );
+
+    if (order.paymentInfo.status === "completed") {
+      return { text: "Paid", color: "bg-green-100 text-green-800" };
+    } else if (daysRemaining < 0) {
+      return { text: "Overdue", color: "bg-red-100 text-red-800" };
+    } else if (daysRemaining <= 7) {
+      return {
+        text: `Due in ${daysRemaining} days`,
+        color: "bg-yellow-100 text-yellow-800",
+      };
+    } else {
+      return {
+        text: `Due in ${daysRemaining} days`,
+        color: "bg-blue-100 text-blue-800",
+      };
+    }
+  };
+
   const generatePDF = () => {
     if (!salesOrder) return;
 
@@ -55,7 +81,7 @@ const DetailSalesOrder = () => {
     doc.setFont("helvetica", "bold");
     doc.text("Sales Order Details", 20, 20);
 
-    // Add company info (placeholder for logo)
+    // Add company info
     doc.setFontSize(12);
     doc.setFont("helvetica", "normal");
     doc.text("Your Company Name", 20, 30);
@@ -70,16 +96,42 @@ const DetailSalesOrder = () => {
       20,
       68
     );
+    doc.text(
+      `Payment Due: ${new Date(
+        salesOrder.paymentInfo.dueDate
+      ).toLocaleDateString()}`,
+      20,
+      76
+    );
 
-    // Order Information Table
+    // Customer Information
     autoTable(doc, {
-      startY: 80,
-      head: [["Field", "Details"]],
-      body: [
-        ["Customer Name", salesOrder.customerName],
-        ["Product", salesOrder.productId.name],
-        ["Quantity", `${salesOrder.quantity} ${salesOrder.packageSize}`],
-      ],
+      startY: 90,
+      head: [["Customer Information"]],
+      body: [[`Name: ${salesOrder.customerName}`]],
+      theme: "grid",
+      headStyles: {
+        fillColor: [22, 160, 133],
+        textColor: [255, 255, 255],
+        fontSize: 12,
+      },
+      bodyStyles: { fontSize: 10 },
+      margin: { left: 20, right: 20 },
+    });
+
+    // Order Items Table
+    const itemsData = salesOrder.items.map((item) => [
+      item.productName,
+      `${item.quantity} ${item.packageSize}`,
+      `$${item.unitPrice}`,
+      `$${item.totalPrice}`,
+      item.supplierName,
+    ]);
+
+    autoTable(doc, {
+      startY: (doc as any).lastAutoTable.finalY + 20,
+      head: [["Product", "Quantity", "Unit Price", "Total", "Supplier"]],
+      body: itemsData,
       theme: "grid",
       headStyles: {
         fillColor: [22, 160, 133],
@@ -92,19 +144,47 @@ const DetailSalesOrder = () => {
 
     // Payment Information Table
     const balance =
-      parseFloat(salesOrder.salesPrice) - (salesOrder.paidAmount || 0);
+      parseFloat(salesOrder.totalAmount) - (salesOrder.paidAmount || 0);
     autoTable(doc, {
       startY: (doc as any).lastAutoTable.finalY + 20,
-      head: [["Field", "Details"]],
+      head: [["Payment Information"]],
       body: [
-        ["Total Price", `$${salesOrder.salesPrice}`],
-        ["Paid Amount", `$${salesOrder.paidAmount || 0}`],
-        ["Unpaid Amount", `$${balance.toFixed(2)}`],
-        ["Status", salesOrder.status],
+        [`Total Amount: $${salesOrder.totalAmount}`],
+        [`Paid Amount: $${salesOrder.paidAmount || 0}`],
+        [`Balance: $${balance.toFixed(2)}`],
+        [`Status: ${salesOrder.status}`],
+        [`Payment Status: ${getPaymentStatus(salesOrder).text}`],
       ],
       theme: "grid",
       headStyles: {
         fillColor: [22, 160, 133],
+        textColor: [255, 255, 255],
+        fontSize: 12,
+      },
+      bodyStyles: { fontSize: 10 },
+      margin: { left: 20, right: 20 },
+    });
+
+    // Supplier Breakdown
+    const supplierBreakdown: Record<string, number> = {};
+    salesOrder.items.forEach((item) => {
+      if (!supplierBreakdown[item.supplierName]) {
+        supplierBreakdown[item.supplierName] = 0;
+      }
+      supplierBreakdown[item.supplierName] += parseFloat(item.totalPrice);
+    });
+
+    const supplierData = Object.entries(supplierBreakdown).map(
+      ([name, total]) => [name, `$${total.toFixed(2)}`]
+    );
+
+    autoTable(doc, {
+      startY: (doc as any).lastAutoTable.finalY + 20,
+      head: [["Supplier", "Total Amount"]],
+      body: supplierData,
+      theme: "grid",
+      headStyles: {
+        fillColor: [52, 73, 94],
         textColor: [255, 255, 255],
         fontSize: 12,
       },
@@ -126,12 +206,17 @@ const DetailSalesOrder = () => {
 
     doc.save(`sales_order_${salesOrder._id?.slice(-6)}.pdf`);
   };
+
+  if (loading) return <div>Loading...</div>;
+  if (!salesOrder) return <div>Sales order not found</div>;
+
   const balance =
-    parseFloat(salesOrder.salesPrice) - (salesOrder.paidAmount || 0);
+    parseFloat(salesOrder.totalAmount) - (salesOrder.paidAmount || 0);
+  const paymentStatus = getPaymentStatus(salesOrder);
 
   return (
     <div className="container mx-auto p-6">
-      <div className="mb-6">
+      <div className="mb-6 flex justify-between">
         <Link to="/sales-orders">
           <Button variant="outline">
             <ArrowLeft className="mr-2 h-4 w-4" /> Back to Sales Orders
@@ -142,7 +227,7 @@ const DetailSalesOrder = () => {
         </Button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
         <Card>
           <CardHeader>
             <CardTitle>Order Information</CardTitle>
@@ -157,18 +242,26 @@ const DetailSalesOrder = () => {
               <p>{salesOrder.customerName}</p>
             </div>
             <div>
-              <h3 className="font-semibold">Product</h3>
-              <p>{salesOrder.productId.name}</p>
+              <h3 className="font-semibold">Created Date</h3>
+              <p>{new Date(salesOrder.createdAt).toLocaleDateString()}</p>
             </div>
             <div>
-              <h3 className="font-semibold">Quantity</h3>
+              <h3 className="font-semibold">Payment Due Date</h3>
               <p>
-                {salesOrder.quantity} {salesOrder.packageSize}
+                {new Date(salesOrder.paymentInfo.dueDate).toLocaleDateString()}
               </p>
             </div>
             <div>
-              <h3 className="font-semibold">Created Date</h3>
-              <p>{new Date(salesOrder.createdAt).toLocaleDateString()}</p>
+              <h3 className="font-semibold">Status</h3>
+              <Badge className={getStatusColor(salesOrder.status)}>
+                {salesOrder.status}
+              </Badge>
+            </div>
+            <div>
+              <h3 className="font-semibold">Payment Status</h3>
+              <Badge className={paymentStatus.color}>
+                {paymentStatus.text}
+              </Badge>
             </div>
           </CardContent>
         </Card>
@@ -179,22 +272,16 @@ const DetailSalesOrder = () => {
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
-              <h3 className="font-semibold">Total Price</h3>
-              <p>${salesOrder.salesPrice}</p>
+              <h3 className="font-semibold">Total Amount</h3>
+              <p>${salesOrder.totalAmount}</p>
             </div>
             <div>
               <h3 className="font-semibold">Paid Amount</h3>
               <p>${salesOrder.paidAmount || 0}</p>
             </div>
             <div>
-              <h3 className="font-semibold">Un paid Amount</h3>
+              <h3 className="font-semibold">Balance</h3>
               <p>${balance.toFixed(2)}</p>
-            </div>
-            <div>
-              <h3 className="font-semibold">Status</h3>
-              <Badge className={getStatusColor(salesOrder.status)}>
-                {salesOrder.status}
-              </Badge>
             </div>
             {balance === 0 && (
               <div className="bg-green-50 p-3 rounded-md">
@@ -211,6 +298,75 @@ const DetailSalesOrder = () => {
           </CardContent>
         </Card>
       </div>
+
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle>Order Items</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 gap-4">
+            {salesOrder.items.map((item, index) => (
+              <div key={index} className="p-4 border rounded-md">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <div>
+                    <h3 className="font-semibold">Product</h3>
+                    <p>{item.productName}</p>
+                  </div>
+                  <div>
+                    <h3 className="font-semibold">Quantity</h3>
+                    <p>
+                      {item.quantity} {item.packageSize}
+                    </p>
+                  </div>
+                  <div>
+                    <h3 className="font-semibold">Unit Price</h3>
+                    <p>${item.unitPrice}</p>
+                  </div>
+                  <div>
+                    <h3 className="font-semibold">Total Price</h3>
+                    <p>${item.totalPrice}</p>
+                  </div>
+                  <div>
+                    <h3 className="font-semibold">Supplier</h3>
+                    <p>{item.supplierName}</p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Supplier Breakdown</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 gap-4">
+            {(() => {
+              const supplierBreakdown: Record<string, number> = {};
+              salesOrder.items.forEach((item) => {
+                if (!supplierBreakdown[item.supplierName]) {
+                  supplierBreakdown[item.supplierName] = 0;
+                }
+                supplierBreakdown[item.supplierName] += parseFloat(
+                  item.totalPrice
+                );
+              });
+
+              return Object.entries(supplierBreakdown).map(([name, total]) => (
+                <div
+                  key={name}
+                  className="p-4 border rounded-md flex justify-between"
+                >
+                  <h3 className="font-semibold">{name}</h3>
+                  <p>${total.toFixed(2)}</p>
+                </div>
+              ));
+            })()}
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 };

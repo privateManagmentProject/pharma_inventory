@@ -1,3 +1,4 @@
+// Updated NewSalesOrder.tsx with fixed supplier search
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -9,47 +10,98 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Field, Form, Formik } from "formik";
-import { ArrowLeft } from "lucide-react";
+import { Field, FieldArray, Form, Formik } from "formik";
+import { ArrowLeft, Plus, Search, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
+import DatePicker from "react-datepicker";
+import "react-datepicker/dist/react-datepicker.css";
 import { Link, useNavigate } from "react-router-dom";
 import * as Yup from "yup";
 import { getCustomers } from "../customers/api/customerAPI";
 import type { Customer } from "../customers/constants/customer";
 import { getProducts } from "../products/api/productAPI";
 import type { Product } from "../products/constants/product";
+import { getSuppliers } from "../suppliers/api/supplierAPI";
+import type { Supplier } from "../suppliers/constants/supplier";
 import { createSalesOrder } from "./api/ salesOrderAPI";
 
 const validationSchema = Yup.object({
-  productId: Yup.string().required("Product is required"),
-  quantity: Yup.number()
-    .required("Quantity is required")
-    .positive("Quantity must be positive")
-    .integer("Quantity must be a whole number"),
-  packageSize: Yup.string().required("Package size is required"),
-  customerId: Yup.string().required("Customer  is required"),
-  paidAmount: Yup.number().min(0, "Paid amount cannot be negative"),
+  customerId: Yup.string().required("Customer is required"),
+  paymentDueDate: Yup.date().required("Payment due date is required"),
+  items: Yup.array()
+    .of(
+      Yup.object().shape({
+        productId: Yup.string().required("Product is required"),
+        quantity: Yup.number()
+          .required("Quantity is required")
+          .positive("Quantity must be positive")
+          .integer("Quantity must be a whole number"),
+        packageSize: Yup.string().required("Package size is required"),
+      })
+    )
+    .min(1, "At least one item is required"),
 });
 
 const NewSalesOrder = () => {
   const navigate = useNavigate();
   const [products, setProducts] = useState<Product[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
-  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
+  const [filteredSuppliers, setFilteredSuppliers] = useState<Supplier[]>([]);
+  const [productSearchTerm, setProductSearchTerm] = useState("");
+  const [supplierSearchTerm, setSupplierSearchTerm] = useState("");
 
   useEffect(() => {
     fetchProducts();
     fetchCustomers();
+    fetchSuppliers();
   }, []);
+
+  useEffect(() => {
+    if (productSearchTerm) {
+      const filtered = products.filter(
+        (product) =>
+          product.name
+            .toLowerCase()
+            .includes(productSearchTerm.toLowerCase()) ||
+          product.description
+            .toLowerCase()
+            .includes(productSearchTerm.toLowerCase())
+      );
+      setFilteredProducts(filtered);
+    } else {
+      setFilteredProducts(products);
+    }
+  }, [productSearchTerm, products]);
+
+  useEffect(() => {
+    if (supplierSearchTerm) {
+      const filtered = suppliers.filter(
+        (supplier) =>
+          supplier.name
+            .toLowerCase()
+            .includes(supplierSearchTerm.toLowerCase()) ||
+          supplier.email
+            .toLowerCase()
+            .includes(supplierSearchTerm.toLowerCase())
+      );
+      setFilteredSuppliers(filtered);
+    } else {
+      setFilteredSuppliers(suppliers);
+    }
+  }, [supplierSearchTerm, suppliers]);
 
   const fetchProducts = async () => {
     try {
       const response = await getProducts();
       setProducts(response.products);
+      setFilteredProducts(response.products);
     } catch (error) {
       console.error("Error fetching products:", error);
     }
   };
+
   const fetchCustomers = async () => {
     try {
       const response = await getCustomers();
@@ -59,23 +111,45 @@ const NewSalesOrder = () => {
     }
   };
 
+  const fetchSuppliers = async () => {
+    try {
+      const response = await getSuppliers();
+      setSuppliers(response.suppliers);
+      setFilteredSuppliers(response.suppliers);
+    } catch (error) {
+      console.error("Error fetching suppliers:", error);
+    }
+  };
+
   const handleSubmit = async (values: any) => {
     try {
-      await createSalesOrder(values);
-      navigate("/salesOrders");
+      // Add supplier information to each item before submitting
+      const itemsWithSuppliers = values.items.map((item: any) => {
+        const product = products.find((p) => p._id === item.productId);
+        return {
+          ...item,
+          supplierId: product?.supplierId,
+        };
+      });
+
+      await createSalesOrder({
+        ...values,
+        items: itemsWithSuppliers,
+      });
+      navigate("/admin/salesOrders");
     } catch (error: any) {
       console.error("Error creating sales order:", error);
       alert(error.response?.data?.message || "Error creating sales order");
     }
   };
 
-  const handleProductChange = (productId: string, setFieldValue: any) => {
+  const getProductSuppliers = (productId: string) => {
     const product = products.find((p) => p._id === productId);
-    setSelectedProduct(product || null);
+    if (!product) return [];
 
-    if (product) {
-      setFieldValue("packageSize", product.packageSize);
-    }
+    // Find the supplier for this product
+    const supplier = suppliers.find((s) => s._id === product.supplierId);
+    return supplier ? [supplier] : [];
   };
 
   return (
@@ -95,11 +169,15 @@ const NewSalesOrder = () => {
         <CardContent>
           <Formik
             initialValues={{
-              productId: "",
-              quantity: "",
-              packageSize: "",
               customerId: "",
-              paidAmount: "0",
+              paymentDueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from now
+              items: [
+                {
+                  productId: "",
+                  quantity: "",
+                  packageSize: "",
+                },
+              ],
             }}
             validationSchema={validationSchema}
             onSubmit={handleSubmit}
@@ -107,33 +185,6 @@ const NewSalesOrder = () => {
             {({ isSubmitting, errors, touched, setFieldValue, values }) => (
               <Form className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="productId">Product</Label>
-                    <Select
-                      onValueChange={(value) => {
-                        setFieldValue("productId", value);
-                        handleProductChange(value, setFieldValue);
-                      }}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select product" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {products.map((product) => (
-                          <SelectItem key={product._id} value={product._id}>
-                            {product.name} - Stock: {product.stock}{" "}
-                            {product.packageSize}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    {errors.productId && touched.productId && (
-                      <div className="text-red-500 text-sm">
-                        {errors.productId}
-                      </div>
-                    )}
-                  </div>
-
                   <div>
                     <Label htmlFor="customerId">Customer</Label>
                     <Select
@@ -145,106 +196,238 @@ const NewSalesOrder = () => {
                         <SelectValue placeholder="Select Customer" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectContent>
-                          {customers.map((customer) => (
-                            <SelectItem key={customer._id} value={customer._id}>
-                              {customer.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
+                        {customers.map((customer) => (
+                          <SelectItem key={customer._id} value={customer._id}>
+                            {customer.name}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
-                    {errors.productId && touched.productId && (
+                    {errors.customerId && touched.customerId && (
                       <div className="text-red-500 text-sm">
-                        {errors.productId}
+                        {errors.customerId as string}
                       </div>
                     )}
                   </div>
+
                   <div>
-                    <Label htmlFor="packageSize">Package Size</Label>
-                    <Select
-                      value={values.packageSize}
-                      onValueChange={(value) =>
-                        setFieldValue("packageSize", value)
+                    <Label htmlFor="paymentDueDate">Payment Due Date</Label>
+                    <DatePicker
+                      selected={values.paymentDueDate}
+                      onChange={(date) => setFieldValue("paymentDueDate", date)}
+                      minDate={new Date()}
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                    />
+                    {errors.paymentDueDate && touched.paymentDueDate && (
+                      <div className="text-red-500 text-sm">
+                        {errors.paymentDueDate as string}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="mt-6">
+                  <div className="flex justify-between items-center mb-4">
+                    <Label>Order Items</Label>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() =>
+                        setFieldValue("items", [
+                          ...values.items,
+                          {
+                            productId: "",
+                            quantity: "",
+                            packageSize: "",
+                          },
+                        ])
                       }
                     >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select package size" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="kg">kg</SelectItem>
-                        <SelectItem value="box">box</SelectItem>
-                        <SelectItem value="bottle">bottle</SelectItem>
-                        <SelectItem value="pack">pack</SelectItem>
-                        <SelectItem value="unit">unit</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    {errors.packageSize && touched.packageSize && (
-                      <div className="text-red-500 text-sm">
-                        {errors.packageSize}
-                      </div>
-                    )}
+                      <Plus className="mr-2 h-4 w-4" /> Add Item
+                    </Button>
                   </div>
 
-                  <div>
-                    <Label htmlFor="quantity">Quantity</Label>
-                    <Field
-                      as={Input}
-                      id="quantity"
-                      name="quantity"
-                      type="number"
-                      placeholder="Enter quantity"
-                    />
-                    {errors.quantity && touched.quantity && (
-                      <div className="text-red-500 text-sm">
-                        {errors.quantity}
-                      </div>
-                    )}
-                    {selectedProduct && (
-                      <p className="text-sm text-muted-foreground mt-1">
-                        Available stock: {selectedProduct.stock}{" "}
-                        {selectedProduct.packageSize}
-                      </p>
-                    )}
-                  </div>
-
-                  <div>
-                    <Label htmlFor="paidAmount">Paid Amount</Label>
-                    <Field
-                      as={Input}
-                      id="paidAmount"
-                      name="paidAmount"
-                      type="number"
-                      placeholder="Enter paid amount"
-                      step="0.01"
-                    />
-                    {errors.paidAmount && touched.paidAmount && (
-                      <div className="text-red-500 text-sm">
-                        {errors.paidAmount}
-                      </div>
-                    )}
-                  </div>
-
-                  {selectedProduct && values.quantity && (
-                    <div>
-                      <Label>Total Price</Label>
+                  <div className="mb-4">
+                    <div className="relative">
+                      <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
                       <Input
-                        value={`$${(
-                          parseFloat(selectedProduct.price) *
-                          parseInt(values.quantity || "0")
-                        ).toFixed(2)}`}
-                        readOnly
-                        className="bg-muted"
+                        placeholder="Search drugs..."
+                        value={productSearchTerm}
+                        onChange={(e) => setProductSearchTerm(e.target.value)}
+                        className="pl-8"
                       />
                     </div>
-                  )}
+                  </div>
+
+                  <FieldArray name="items">
+                    {({ remove, push }) => (
+                      <div className="space-y-4">
+                        {values.items.map((item, index) => {
+                          const productSuppliers = getProductSuppliers(
+                            item.productId
+                          );
+                          const selectedProduct = products.find(
+                            (p) => p._id === item.productId
+                          );
+
+                          return (
+                            <div key={index} className="p-4 border rounded-md">
+                              <div className="flex justify-between items-start mb-4">
+                                <h4 className="font-medium">
+                                  Item #{index + 1}
+                                </h4>
+                                {values.items.length > 1 && (
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => remove(index)}
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                )}
+                              </div>
+
+                              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div>
+                                  <Label htmlFor={`items.${index}.productId`}>
+                                    Product
+                                  </Label>
+                                  <Select
+                                    value={item.productId}
+                                    onValueChange={(value) => {
+                                      setFieldValue(
+                                        `items.${index}.productId`,
+                                        value
+                                      );
+                                      const product = products.find(
+                                        (p) => p._id === value
+                                      );
+                                      if (product) {
+                                        setFieldValue(
+                                          `items.${index}.packageSize`,
+                                          product.packageSize
+                                        );
+                                      }
+                                    }}
+                                  >
+                                    <SelectTrigger>
+                                      <SelectValue placeholder="Select product" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {filteredProducts.map((product) => (
+                                        <SelectItem
+                                          key={product._id}
+                                          value={product._id}
+                                        >
+                                          {product.name} - Stock:{" "}
+                                          {product.stock} {product.packageSize}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                  {errors.items?.[index]?.productId &&
+                                    touched.items?.[index]?.productId && (
+                                      <div className="text-red-500 text-sm">
+                                        {
+                                          errors.items[index]
+                                            ?.productId as string
+                                        }
+                                      </div>
+                                    )}
+                                </div>
+
+                                <div>
+                                  <Label htmlFor={`items.${index}.quantity`}>
+                                    Quantity
+                                  </Label>
+                                  <Field
+                                    as={Input}
+                                    id={`items.${index}.quantity`}
+                                    name={`items.${index}.quantity`}
+                                    type="number"
+                                    placeholder="Enter quantity"
+                                  />
+                                  {errors.items?.[index]?.quantity &&
+                                    touched.items?.[index]?.quantity && (
+                                      <div className="text-red-500 text-sm">
+                                        {
+                                          errors.items[index]
+                                            ?.quantity as string
+                                        }
+                                      </div>
+                                    )}
+                                  {selectedProduct && (
+                                    <p className="text-sm text-muted-foreground mt-1">
+                                      Available stock: {selectedProduct.stock}{" "}
+                                      {selectedProduct.packageSize}
+                                    </p>
+                                  )}
+                                </div>
+
+                                <div>
+                                  <Label htmlFor={`items.${index}.packageSize`}>
+                                    Package Size
+                                  </Label>
+                                  <Select
+                                    value={item.packageSize}
+                                    onValueChange={(value) =>
+                                      setFieldValue(
+                                        `items.${index}.packageSize`,
+                                        value
+                                      )
+                                    }
+                                  >
+                                    <SelectTrigger>
+                                      <SelectValue placeholder="Select package size" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="kg">kg</SelectItem>
+                                      <SelectItem value="box">box</SelectItem>
+                                      <SelectItem value="bottle">
+                                        bottle
+                                      </SelectItem>
+                                      <SelectItem value="pack">pack</SelectItem>
+                                      <SelectItem value="unit">unit</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                  {errors.items?.[index]?.packageSize &&
+                                    touched.items?.[index]?.packageSize && (
+                                      <div className="text-red-500 text-sm">
+                                        {
+                                          errors.items[index]
+                                            ?.packageSize as string
+                                        }
+                                      </div>
+                                    )}
+                                </div>
+
+                                {productSuppliers.length > 0 && (
+                                  <div>
+                                    <Label>Supplier</Label>
+                                    <div className="p-2 bg-muted rounded-md">
+                                      {productSuppliers[0].name}
+                                    </div>
+                                    <p className="text-sm text-muted-foreground mt-1">
+                                      This product is supplied by{" "}
+                                      {productSuppliers[0].name}
+                                    </p>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </FieldArray>
                 </div>
 
                 <div className="flex justify-end space-x-2 pt-4">
                   <Button
                     type="button"
                     variant="outline"
-                    onClick={() => navigate("/admin/salesOrders")}
+                    onClick={() => navigate("/salesOrders")}
                   >
                     Cancel
                   </Button>

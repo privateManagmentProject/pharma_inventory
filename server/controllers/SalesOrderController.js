@@ -1,67 +1,72 @@
 import CustomerModal from "../models/Customer.js";
 import ProductModal from "../models/Product.js";
 import SalesOrderModal from "../models/SalesOrder.js";
+// SalesOrderController.js (Updated)
 const createSalesOrder = async (req, res) => {
-    try {
-        const { productId, quantity, packageSize, customerId, paidAmount = 0 } = req.body;
+  try {
+    const { customerId, items, paymentDueDate } = req.body;
 
-        // Check if product exists
-        const product = await ProductModal.findById(productId);
-        if (!product) {
-            return res.status(404).json({ success: false, message: "Product not found" });
-        }
-
-        
-
-        // Check if there's enough stock
-        if (parseInt(product.stock) < parseInt(quantity)) {
-            return res.status(400).json({ 
-                success: false, 
-                message: "Insufficient stock available" 
-            });
-        }
-
-        // Calculate total sales price
-        const salesPrice = (parseFloat(product.price) * parseInt(quantity)).toFixed(2);
-        
-        // Determine initial status based on payment
-        let status = 'pending';
-        if (paidAmount > 0) {
-            status = parseFloat(paidAmount) >= parseFloat(salesPrice) ? 'approved' : 'progress';
-        }
-const customer =await CustomerModal.findById(customerId);
-if(!customer){
-    return res.status(404).json({ success: false, message: "Customer not found" });
-}
-        const newSalesOrder = new SalesOrderModal({
-            productId,
-            productName: product.name,
-            quantity,
-            packageSize,
-            salesPrice,
-            paidAmount: parseFloat(paidAmount),
-            status,
-            customerId,
-            customerName: customer.name,
-        });
-
-        await newSalesOrder.save();
-        
-        // Update stock if fully paid/approved
-        if (status === 'approved') {
-            product.stock = (parseInt(product.stock) - parseInt(quantity)).toString();
-            await product.save();
-        }
-        
-        return res.status(201).json({ 
-            success: true, 
-            message: "Sales order created successfully", 
-            salesOrder: newSalesOrder 
-        });
-
-    } catch (error) {
-        return res.status(500).json({ success: false, message: "Server error" });
+    // Validate customer
+    const customer = await CustomerModal.findById(customerId);
+    if (!customer) {
+      return res.status(404).json({ success: false, message: "Customer not found" });
     }
+
+    // Validate items and calculate total
+    let totalAmount = 0;
+    const orderItems = [];
+    
+    for (const item of items) {
+      const product = await ProductModal.findById(item.productId);
+      if (!product) {
+        return res.status(404).json({ success: false, message: `Product ${item.productId} not found` });
+      }
+      
+      if (parseInt(product.stock) < parseInt(item.quantity)) {
+        return res.status(400).json({ 
+          success: false, 
+          message: `Insufficient stock for ${product.name}` 
+        });
+      }
+      
+      const itemTotal = parseFloat(product.price) * parseInt(item.quantity);
+      totalAmount += itemTotal;
+      
+      orderItems.push({
+        productId: item.productId,
+        quantity: item.quantity,
+        packageSize: item.packageSize,
+        unitPrice: product.price,
+        totalPrice: itemTotal.toFixed(2),
+        supplierId: product.supplierId
+      });
+    }
+
+    // Create sales order
+    const newSalesOrder = new SalesOrderModal({
+      customerId,
+      items: orderItems,
+      totalAmount: totalAmount.toFixed(2),
+      paymentInfo: {
+        dueDate: paymentDueDate,
+        status: 'pending'
+      },
+      status: 'pending',
+      customerName: customer.name,
+    });
+
+    await newSalesOrder.save();
+    
+    return res.status(201).json({ 
+      success: true, 
+      message: "Sales order created successfully", 
+      salesOrder: newSalesOrder 
+    });
+
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ success: false, message: "Server error" });
+  }
 };
 
 const getSalesOrders = async (req, res) => {
@@ -73,9 +78,7 @@ const getSalesOrders = async (req, res) => {
         if (customerName) filter.customerName = { $regex: customerName, $options: 'i' };
         if (productName) filter.productName = { $regex: productName, $options: 'i' };
 
-        const salesOrders = await SalesOrderModal.find(filter)
-            .populate('productId')
-            .sort({ createdAt: -1 });
+        const salesOrders = await SalesOrderModal.find(filter);
             
         return res.status(200).json({ success: true, salesOrders });
     } catch (error) {
@@ -97,20 +100,19 @@ const updateSalesOrder = async (req, res) => {
         const oldStatus = salesOrder.status;
         
         // Update paid amount if provided
-      if (paidAmount !== undefined) {
-    const additionalAmount = parseFloat(paidAmount);
-    salesOrder.paidAmount += additionalAmount;
-    
-    // Auto-update status based on payment
-    if (salesOrder.paidAmount >= parseFloat(salesOrder.salesPrice)) {
-        salesOrder.status = 'approved';
-    } else if (salesOrder.paidAmount > 0) {
-        salesOrder.status = 'progress';
-    } else {
-        salesOrder.status = 'pending';
-    }
-}
-
+        if (paidAmount !== undefined) {
+            const additionalAmount = parseFloat(paidAmount);
+            salesOrder.paidAmount += additionalAmount;
+            
+            // Auto-update status based on payment
+            if (salesOrder.paidAmount >= parseFloat(salesOrder.totalAmount)) {
+                salesOrder.status = 'approved';
+            } else if (salesOrder.paidAmount > 0) {
+                salesOrder.status = 'progress';
+            } else {
+                salesOrder.status = 'pending';
+            }
+        }
 
         // Manual status override if provided
         if (status) {
@@ -118,7 +120,7 @@ const updateSalesOrder = async (req, res) => {
             
             // If manually approved, set paid amount to full price
             if (status === 'approved') {
-                salesOrder.paidAmount = parseFloat(salesOrder.salesPrice);
+                salesOrder.paidAmount = parseFloat(salesOrder.totalAmount);
             }
         }
 
@@ -131,20 +133,25 @@ const updateSalesOrder = async (req, res) => {
 
         await salesOrder.save();
 
-        // Handle stock changes
-        const product = await ProductModal.findById(salesOrder.productId);
-        if (product) {
-            // If status changed to approved and was not approved before
-            if (salesOrder.status === 'approved' && oldStatus !== 'approved') {
-                // Reduce stock when order is approved
-                product.stock = (parseInt(product.stock) - parseInt(salesOrder.quantity)).toString();
-            } 
-            // If status changed from approved to something else
-            else if (oldStatus === 'approved' && salesOrder.status !== 'approved') {
-                // Restock if order is no longer approved
-                product.stock = (parseInt(product.stock) + parseInt(salesOrder.quantity)).toString();
+        // Handle stock changes for multiple items
+        if (salesOrder.status === 'approved' && oldStatus !== 'approved') {
+            // Reduce stock for all items when order is approved
+            for (const item of salesOrder.items) {
+                const product = await ProductModal.findById(item.productId);
+                if (product) {
+                    product.stock = (parseInt(product.stock) - parseInt(item.quantity)).toString();
+                    await product.save();
+                }
             }
-            await product.save();
+        } else if (oldStatus === 'approved' && salesOrder.status !== 'approved') {
+            // Restock all items if order is no longer approved
+            for (const item of salesOrder.items) {
+                const product = await ProductModal.findById(item.productId);
+                if (product) {
+                    product.stock = (parseInt(product.stock) + parseInt(item.quantity)).toString();
+                    await product.save();
+                }
+            }
         }
 
         return res.status(200).json({ 
@@ -213,7 +220,7 @@ const getSalesOrderById = async (req, res) => {
   try {
    const { id } = req.params;
     const salesOrder = await SalesOrderModal.findById(id)
-      .populate('productId')
+      .populate('items.productId')  // Populate productId in items
       .populate('customerId');  
     if (!salesOrder) {
       return res.status(404).json({ success: false, message: "Sales order not found" });

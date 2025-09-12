@@ -1,3 +1,4 @@
+// Updated EditSalesOrder.tsx
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -22,16 +23,7 @@ const EditSalesOrder = () => {
   const navigate = useNavigate();
   const [salesOrder, setSalesOrder] = useState<SalesOrder | null>(null);
   const [loading, setLoading] = useState(true);
-  const getValidationSchema = () => {
-    const balance =
-      parseFloat(salesOrder.salesPrice) - (salesOrder.paidAmount || 0);
-    return Yup.object({
-      paidAmount: Yup.number()
-        .min(0, "Paid amount cannot be negative")
-        .max(balance, "Cannot pay more than the unpaid amount"),
-      status: Yup.string().required("Status is required"),
-    });
-  };
+
   useEffect(() => {
     if (id) {
       fetchSalesOrder();
@@ -49,6 +41,19 @@ const EditSalesOrder = () => {
     }
   };
 
+  const getValidationSchema = () => {
+    if (!salesOrder) return Yup.object({});
+
+    const balance =
+      parseFloat(salesOrder.totalAmount) - (salesOrder.paidAmount || 0);
+    return Yup.object({
+      paidAmount: Yup.number()
+        .min(0, "Paid amount cannot be negative")
+        .max(balance, "Cannot pay more than the unpaid amount"),
+      status: Yup.string().required("Status is required"),
+    });
+  };
+
   const handleSubmit = async (values: any) => {
     try {
       await updateSalesOrder(id!, values);
@@ -63,7 +68,7 @@ const EditSalesOrder = () => {
   if (!salesOrder) return <div>Sales order not found</div>;
 
   const balance =
-    parseFloat(salesOrder.salesPrice) - (salesOrder.paidAmount || 0);
+    parseFloat(salesOrder.totalAmount) - (salesOrder.paidAmount || 0);
 
   return (
     <div className="container mx-auto p-6">
@@ -90,28 +95,70 @@ const EditSalesOrder = () => {
                 <strong>Customer:</strong> {salesOrder.customerName}
               </p>
               <p>
-                <strong>Product:</strong> {salesOrder.productName}
+                <strong>Items:</strong> {salesOrder.items.length} products
               </p>
               <p>
-                <strong>Quantity:</strong> {salesOrder.quantity}{" "}
-                {salesOrder.packageSize}
+                <strong>Created Date:</strong>{" "}
+                {new Date(salesOrder.createdAt).toLocaleDateString()}
+              </p>
+              <p>
+                <strong>Payment Due Date:</strong>{" "}
+                {new Date(salesOrder.paymentInfo.dueDate).toLocaleDateString()}
               </p>
             </div>
             <div className="space-y-2">
               <h3 className="font-semibold">Payment Information</h3>
               <p>
-                <strong>Total Price:</strong> ${salesOrder.salesPrice}
+                <strong>Total Amount:</strong> ${salesOrder.totalAmount}
               </p>
               <p>
                 <strong>Current Paid Amount:</strong> $
                 {salesOrder.paidAmount || 0}
               </p>
               <p>
-                <strong>Un Paid Amount:</strong> ${balance.toFixed(2)}
+                <strong>Balance:</strong> ${balance.toFixed(2)}
               </p>
               <p>
                 <strong>Current Status:</strong> {salesOrder.status}
               </p>
+              <p>
+                <strong>Payment Status:</strong> {salesOrder.paymentInfo.status}
+              </p>
+            </div>
+          </div>
+
+          {/* Order Items */}
+          <div className="mb-6">
+            <h3 className="font-semibold mb-4">Order Items</h3>
+            <div className="grid grid-cols-1 gap-4">
+              {salesOrder.items.map((item, index) => (
+                <div key={index} className="p-4 border rounded-md">
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div>
+                      <h4 className="font-semibold">Product</h4>
+                      <p>{item.productName}</p>
+                    </div>
+                    <div>
+                      <h4 className="font-semibold">Quantity</h4>
+                      <p>
+                        {item.quantity} {item.packageSize}
+                      </p>
+                    </div>
+                    <div>
+                      <h4 className="font-semibold">Unit Price</h4>
+                      <p>${item.unitPrice}</p>
+                    </div>
+                    <div>
+                      <h4 className="font-semibold">Total Price</h4>
+                      <p>${item.totalPrice}</p>
+                    </div>
+                    <div>
+                      <h4 className="font-semibold">Supplier</h4>
+                      <p>{item.supplierName}</p>
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
 
@@ -127,15 +174,17 @@ const EditSalesOrder = () => {
               <Form className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <Label htmlFor="paidAmount">Paid Amount</Label>
+                    <Label htmlFor="paidAmount">
+                      Additional Payment Amount
+                    </Label>
                     <Field
                       as={Input}
                       id="paidAmount"
                       name="paidAmount"
                       type="number"
-                      placeholder="Enter paid amount"
+                      placeholder="Enter additional payment amount"
                       step="0.01"
-                      max={salesOrder.salesPrice}
+                      max={balance}
                     />
                     {errors.paidAmount && touched.paidAmount && (
                       <div className="text-red-500 text-sm">
@@ -143,7 +192,7 @@ const EditSalesOrder = () => {
                       </div>
                     )}
                     <p className="text-sm text-muted-foreground mt-1">
-                      Maximum: ${salesOrder.salesPrice}
+                      Maximum: ${balance.toFixed(2)}
                     </p>
                   </div>
 
@@ -161,6 +210,7 @@ const EditSalesOrder = () => {
                         <SelectItem value="progress">Progress</SelectItem>
                         <SelectItem value="approved">Approved</SelectItem>
                         <SelectItem value="rejected">Rejected</SelectItem>
+                        <SelectItem value="completed">Completed</SelectItem>
                       </SelectContent>
                     </Select>
                     {errors.status && touched.status && (
@@ -173,12 +223,15 @@ const EditSalesOrder = () => {
 
                 <div className="bg-muted p-4 rounded-md">
                   <h4 className="font-semibold mb-2">Payment Summary</h4>
-                  <p>Total Price: ${salesOrder.salesPrice}</p>
-                  <p>New Paid Amount: ${parseFloat(values.paidAmount)}</p>
+                  <p>Total Amount: ${salesOrder.totalAmount}</p>
+                  <p>Current Paid Amount: ${salesOrder.paidAmount || 0}</p>
                   <p>
-                    New Paid Amount: $
+                    Additional Payment: ${parseFloat(values.paidAmount || "0")}
+                  </p>
+                  <p>
+                    New Total Paid: $
                     {(
-                      salesOrder.paidAmount +
+                      (salesOrder.paidAmount || 0) +
                       parseFloat(values.paidAmount || "0")
                     ).toFixed(2)}
                   </p>
@@ -190,7 +243,7 @@ const EditSalesOrder = () => {
                   </p>
                   <p className="mt-2 text-sm">
                     Note: Setting status to "Approved" will automatically update
-                    the product stock.
+                    the product stock for all items in the order.
                   </p>
                 </div>
 

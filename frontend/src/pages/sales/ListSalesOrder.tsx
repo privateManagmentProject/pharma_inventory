@@ -1,3 +1,4 @@
+// Updated ListSalesOrder.tsx
 import { DataTable } from "@/components/DataTable";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -10,6 +11,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { deleteSalesOrder, getSalesOrders } from "./api/ salesOrderAPI";
 import type { SalesOrder } from "./constants/salesOrder";
+
 const ListSalesOrder = () => {
   const navigate = useNavigate();
   const [salesOrders, setSalesOrders] = useState<SalesOrder[]>([]);
@@ -61,10 +63,37 @@ const ListSalesOrder = () => {
         return "bg-red-100 text-red-800";
       case "progress":
         return "bg-blue-100 text-blue-800";
+      case "completed":
+        return "bg-purple-100 text-purple-800";
       default:
         return "bg-yellow-100 text-yellow-800";
     }
   };
+
+  const getPaymentStatus = (order: SalesOrder) => {
+    const today = new Date();
+    const dueDate = new Date(order.paymentInfo?.dueDate);
+    const daysRemaining = Math.ceil(
+      (dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)
+    );
+
+    if (order.paymentInfo?.status === "completed") {
+      return { text: "Paid", color: "bg-green-100 text-green-800" };
+    } else if (daysRemaining < 0) {
+      return { text: "Overdue", color: "bg-red-100 text-red-800" };
+    } else if (daysRemaining <= 7) {
+      return {
+        text: `Due in ${daysRemaining} days`,
+        color: "bg-yellow-100 text-yellow-800",
+      };
+    } else {
+      return {
+        text: `Due in ${daysRemaining} days`,
+        color: "bg-blue-100 text-blue-800",
+      };
+    }
+  };
+
   const generatePDF = (order: SalesOrder) => {
     const doc = new jsPDF();
 
@@ -73,7 +102,7 @@ const ListSalesOrder = () => {
     doc.setFont("helvetica", "bold");
     doc.text("Sales Order Details", 20, 20);
 
-    // Add company info (placeholder for logo)
+    // Add company info
     doc.setFontSize(12);
     doc.setFont("helvetica", "normal");
     doc.text("Your Company Name", 20, 30);
@@ -88,17 +117,42 @@ const ListSalesOrder = () => {
       20,
       68
     );
+    doc.text(
+      `Payment Due: ${new Date(
+        order.paymentInfo.dueDate
+      ).toLocaleDateString()}`,
+      20,
+      76
+    );
 
-    // Order Information Table
+    // Customer Information
     autoTable(doc, {
-      startY: 80,
-      head: [["Field", "Details"]],
-      body: [
-        ["Customer Name", order.customerName],
-        ["Product", order.productId.name],
+      startY: 90,
+      head: [["Customer Information"]],
+      body: [[`Name: ${order.customerName}`]],
+      theme: "grid",
+      headStyles: {
+        fillColor: [22, 160, 133],
+        textColor: [255, 255, 255],
+        fontSize: 12,
+      },
+      bodyStyles: { fontSize: 10 },
+      margin: { left: 20, right: 20 },
+    });
 
-        ["Quantity", `${order.quantity} ${order.packageSize}`],
-      ],
+    // Order Items Table
+    const itemsData = order.items.map((item) => [
+      item.productName,
+      `${item.quantity} ${item.packageSize}`,
+      `$${item.unitPrice}`,
+      `$${item.totalPrice}`,
+      item.supplierName,
+    ]);
+
+    autoTable(doc, {
+      startY: (doc as any).lastAutoTable.finalY + 20,
+      head: [["Product", "Quantity", "Unit Price", "Total", "Supplier"]],
+      body: itemsData,
       theme: "grid",
       headStyles: {
         fillColor: [22, 160, 133],
@@ -110,19 +164,47 @@ const ListSalesOrder = () => {
     });
 
     // Payment Information Table
-    const balance = parseFloat(order.salesPrice) - (order.paidAmount || 0);
+    const balance = parseFloat(order.totalAmount) - (order.paidAmount || 0);
     autoTable(doc, {
       startY: (doc as any).lastAutoTable.finalY + 20,
-      head: [["Field", "Details"]],
+      head: [["Payment Information"]],
       body: [
-        ["Total Price", `$${order.salesPrice}`],
-        ["Paid Amount", `$${order.paidAmount || 0}`],
-        ["Unpaid Amount", `$${balance.toFixed(2)}`],
-        ["Status", order.status],
+        [`Total Amount: $${order.totalAmount}`],
+        [`Paid Amount: $${order.paidAmount || 0}`],
+        [`Balance: $${balance.toFixed(2)}`],
+        [`Status: ${order.status}`],
+        [`Payment Status: ${getPaymentStatus(order).text}`],
       ],
       theme: "grid",
       headStyles: {
         fillColor: [22, 160, 133],
+        textColor: [255, 255, 255],
+        fontSize: 12,
+      },
+      bodyStyles: { fontSize: 10 },
+      margin: { left: 20, right: 20 },
+    });
+
+    // Supplier Breakdown
+    const supplierBreakdown: Record<string, number> = {};
+    order.items.forEach((item) => {
+      if (!supplierBreakdown[item.supplierName]) {
+        supplierBreakdown[item.supplierName] = 0;
+      }
+      supplierBreakdown[item.supplierName] += parseFloat(item.totalPrice);
+    });
+
+    const supplierData = Object.entries(supplierBreakdown).map(
+      ([name, total]) => [name, `$${total.toFixed(2)}`]
+    );
+
+    autoTable(doc, {
+      startY: (doc as any).lastAutoTable.finalY + 20,
+      head: [["Supplier", "Total Amount"]],
+      body: supplierData,
+      theme: "grid",
+      headStyles: {
+        fillColor: [52, 73, 94],
         textColor: [255, 255, 255],
         fontSize: 12,
       },
@@ -144,24 +226,21 @@ const ListSalesOrder = () => {
 
     doc.save(`sales_order_${order._id?.slice(-6)}.pdf`);
   };
+
   const columns: ColumnDef<SalesOrder>[] = [
     {
       header: "Customer Name",
       accessorKey: "customerName",
     },
     {
-      header: "Product",
-      accessorKey: "productId.name",
+      header: "Items Count",
+      accessorKey: "items",
+      cell: ({ row }) => row.original.items.length,
     },
     {
-      header: "Quantity",
-      accessorKey: "quantity",
-      cell: ({ row }) => `${row.original.quantity} ${row.original.packageSize}`,
-    },
-    {
-      header: "Total Price",
-      accessorKey: "salesPrice",
-      cell: ({ row }) => `$${row.original.salesPrice}`,
+      header: "Total Amount",
+      accessorKey: "totalAmount",
+      cell: ({ row }) => `$${row.original.totalAmount}`,
     },
     {
       header: "Paid Amount",
@@ -169,11 +248,11 @@ const ListSalesOrder = () => {
       cell: ({ row }) => `$${row.original.paidAmount || 0}`,
     },
     {
-      header: "Unpaid Amount",
+      header: "Balance",
       cell: ({ row }) => {
         const order = row.original;
         return `$${(
-          parseFloat(order.salesPrice) - (order.paidAmount || 0)
+          parseFloat(order.totalAmount) - (order.paidAmount || 0)
         ).toFixed(2)}`;
       },
     },
@@ -181,10 +260,22 @@ const ListSalesOrder = () => {
       header: "Status",
       accessorKey: "status",
       cell: ({ row }) => (
-        <Badge className={getStatusColor(row.original.status)}>
+        <Badge className={getStatusColor(row.original?.status)}>
           {row.original.status}
         </Badge>
       ),
+    },
+    {
+      header: "Payment Status",
+      cell: ({ row }) => {
+        const status = getPaymentStatus(row.original);
+        return <Badge className={status.color}>{status.text}</Badge>;
+      },
+    },
+    {
+      header: "Due Date",
+      cell: ({ row }) =>
+        new Date(row.original.paymentInfo?.dueDate).toLocaleDateString(),
     },
     {
       header: "Date",
@@ -239,7 +330,7 @@ const ListSalesOrder = () => {
         <CardContent className="p-4">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <Input
-              placeholder="Search by customer or product..."
+              placeholder="Search by customer..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
@@ -253,6 +344,7 @@ const ListSalesOrder = () => {
                 <SelectItem value="progress">Progress</SelectItem>
                 <SelectItem value="approved">Approved</SelectItem>
                 <SelectItem value="rejected">Rejected</SelectItem>
+                <SelectItem value="completed">Completed</SelectItem>
               </SelectContent>
             </Select>
             <Button onClick={handleFilter}>Apply Filters</Button>
