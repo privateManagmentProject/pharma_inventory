@@ -1,4 +1,3 @@
-// Updated ListSalesOrder.tsx
 import { DataTable } from "@/components/DataTable";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -58,13 +57,12 @@ const ListSalesOrder = () => {
   const getStatusColor = (status: string) => {
     switch (status) {
       case "approved":
+      case "completed":
         return "bg-green-100 text-green-800";
       case "rejected":
         return "bg-red-100 text-red-800";
       case "progress":
         return "bg-blue-100 text-blue-800";
-      case "completed":
-        return "bg-purple-100 text-purple-800";
       default:
         return "bg-yellow-100 text-yellow-800";
     }
@@ -79,6 +77,8 @@ const ListSalesOrder = () => {
 
     if (order.paymentInfo?.status === "completed") {
       return { text: "Paid", color: "bg-green-100 text-green-800" };
+    } else if (order.paymentInfo?.status === "overdue") {
+      return { text: "Overdue", color: "bg-red-100 text-red-800" };
     } else if (daysRemaining < 0) {
       return { text: "Overdue", color: "bg-red-100 text-red-800" };
     } else if (daysRemaining <= 7) {
@@ -325,32 +325,6 @@ const ListSalesOrder = () => {
           <Plus className="mr-2 h-4 w-4" /> New Sales Order
         </Button>
       </div>
-
-      {/* <Card className="mb-6">
-        <CardContent className="p-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Input
-              placeholder="Search by customer..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger>
-                <SelectValue placeholder="Filter by status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="">All Status</SelectItem>
-                <SelectItem value="pending">Pending</SelectItem>
-                <SelectItem value="progress">Progress</SelectItem>
-                <SelectItem value="approved">Approved</SelectItem>
-                <SelectItem value="rejected">Rejected</SelectItem>
-                <SelectItem value="completed">Completed</SelectItem>
-              </SelectContent>
-            </Select>
-            <Button onClick={handleFilter}>Apply Filters</Button>
-          </div>
-        </CardContent>
-      </Card> */}
 
       <Card className="shadow-md bg-white dark:bg-gray-800">
         <CardContent className="p-0">

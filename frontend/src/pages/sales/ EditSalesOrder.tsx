@@ -1,4 +1,3 @@
-// Updated EditSalesOrder.tsx
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -133,10 +132,15 @@ const EditSalesOrder = () => {
             <div className="grid grid-cols-1 gap-4">
               {salesOrder.items.map((item, index) => (
                 <div key={index} className="p-4 border rounded-md">
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
                     <div>
                       <h4 className="font-semibold">Product</h4>
                       <p>{item.productName}</p>
+                      {item.productCategory && (
+                        <p className="text-sm text-muted-foreground">
+                          Category: {item.productCategory}
+                        </p>
+                      )}
                     </div>
                     <div>
                       <h4 className="font-semibold">Quantity</h4>
@@ -242,8 +246,9 @@ const EditSalesOrder = () => {
                     )}
                   </p>
                   <p className="mt-2 text-sm">
-                    Note: Setting status to "Approved" will automatically update
-                    the product stock for all items in the order.
+                    Note: Setting status to "Approved" or "Completed" will
+                    automatically update the product stock for all items in the
+                    order.
                   </p>
                 </div>
 

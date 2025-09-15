@@ -1,4 +1,3 @@
-// Updated DetailSalesOrder.tsx
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -35,13 +34,12 @@ const DetailSalesOrder = () => {
   const getStatusColor = (status: string) => {
     switch (status) {
       case "approved":
+      case "completed":
         return "bg-green-100 text-green-800";
       case "rejected":
         return "bg-red-100 text-red-800";
       case "progress":
         return "bg-blue-100 text-blue-800";
-      case "completed":
-        return "bg-purple-100 text-purple-800";
       default:
         return "bg-yellow-100 text-yellow-800";
     }
@@ -56,6 +54,8 @@ const DetailSalesOrder = () => {
 
     if (order.paymentInfo.status === "completed") {
       return { text: "Paid", color: "bg-green-100 text-green-800" };
+    } else if (order.paymentInfo.status === "overdue") {
+      return { text: "Overdue", color: "bg-red-100 text-red-800" };
     } else if (daysRemaining < 0) {
       return { text: "Overdue", color: "bg-red-100 text-red-800" };
     } else if (daysRemaining <= 7) {
@@ -307,10 +307,15 @@ const DetailSalesOrder = () => {
           <div className="grid grid-cols-1 gap-4">
             {salesOrder.items.map((item, index) => (
               <div key={index} className="p-4 border rounded-md">
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
                   <div>
                     <h3 className="font-semibold">Product</h3>
                     <p>{item.productName}</p>
+                    {item.productCategory && (
+                      <p className="text-sm text-muted-foreground">
+                        Category: {item.productCategory}
+                      </p>
+                    )}
                   </div>
                   <div>
                     <h3 className="font-semibold">Quantity</h3>

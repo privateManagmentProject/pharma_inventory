@@ -1,4 +1,3 @@
-// Updated NewSalesOrder.tsx with fixed supplier search
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -48,9 +47,7 @@ const NewSalesOrder = () => {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
-  const [filteredSuppliers, setFilteredSuppliers] = useState<Supplier[]>([]);
   const [productSearchTerm, setProductSearchTerm] = useState("");
-  const [supplierSearchTerm, setSupplierSearchTerm] = useState("");
 
   useEffect(() => {
     fetchProducts();
@@ -75,23 +72,6 @@ const NewSalesOrder = () => {
     }
   }, [productSearchTerm, products]);
 
-  useEffect(() => {
-    if (supplierSearchTerm) {
-      const filtered = suppliers.filter(
-        (supplier) =>
-          supplier.name
-            .toLowerCase()
-            .includes(supplierSearchTerm.toLowerCase()) ||
-          supplier.email
-            .toLowerCase()
-            .includes(supplierSearchTerm.toLowerCase())
-      );
-      setFilteredSuppliers(filtered);
-    } else {
-      setFilteredSuppliers(suppliers);
-    }
-  }, [supplierSearchTerm, suppliers]);
-
   const fetchProducts = async () => {
     try {
       const response = await getProducts();
@@ -115,7 +95,6 @@ const NewSalesOrder = () => {
     try {
       const response = await getSuppliers();
       setSuppliers(response.suppliers);
-      setFilteredSuppliers(response.suppliers);
     } catch (error) {
       console.error("Error fetching suppliers:", error);
     }
@@ -123,19 +102,7 @@ const NewSalesOrder = () => {
 
   const handleSubmit = async (values: any) => {
     try {
-      // Add supplier information to each item before submitting
-      const itemsWithSuppliers = values.items.map((item: any) => {
-        const product = products.find((p) => p._id === item.productId);
-        return {
-          ...item,
-          supplierId: product?.supplierId,
-        };
-      });
-
-      await createSalesOrder({
-        ...values,
-        items: itemsWithSuppliers,
-      });
+      await createSalesOrder(values);
       navigate("/admin/salesOrders");
     } catch (error: any) {
       console.error("Error creating sales order:", error);
