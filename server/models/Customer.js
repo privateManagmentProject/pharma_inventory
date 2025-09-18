@@ -18,7 +18,10 @@ const CustomerSchema = new mongoose.Schema({
         address: { type: String, required: true }
     },
     withhold: { type: Boolean, default: false },
-    createdAt: { type: Date, default: Date.now }
+    userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true }, // Track which user added this customer
+    isActive: { type: Boolean, default: true },
+    createdAt: { type: Date, default: Date.now },
+    updatedAt: { type: Date, default: Date.now }
 });
 
 const CustomerModal = mongoose.model("Customer", CustomerSchema);

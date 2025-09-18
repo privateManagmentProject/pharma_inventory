@@ -68,28 +68,88 @@ const createSupplier = async (req, res) => {
         description: description || "",
         tinNumber,
         licenses,
-        accounts: parsedAccounts
+        accounts: parsedAccounts,
+        userId: req.user._id // Track which user created this supplier
       });
       
       await newSupplier.save();
-      return res.status(201).json({ success: true, message: "Supplier added successfully" });
+      return res.status(201).json({ success: true, message: "Supplier added successfully", supplier: newSupplier });
     });
   } catch(error) {
+    console.error("Create supplier error:", error);
     return res.status(500).json({ success: false, message: "Server error" });
   }
 };
 
 const getSuppliers = async(req, res) => {
   try {
-    const {search} = req.query;
-    let filter = {};
-    if(search) {
-      filter.name = { $regex: search, $options: 'i' };
+    const {
+      search,
+      email,
+      dateFrom,
+      dateTo,
+      sortBy = 'createdAt',
+      sortOrder = 'desc',
+      page = 1,
+      limit = 10
+    } = req.query;
+    
+    let filter = { isActive: true };
+    
+    // Role-based filtering
+    if (req.user.role !== 'admin') {
+      filter.userId = req.user._id;
     }
-    const suppliers = await SupplierModal.find(filter);
-    return res.status(200).json({ success: true, suppliers, total: suppliers.length });
+    
+    // Search filters
+    if (search) {
+      filter.$or = [
+        { name: { $regex: search, $options: 'i' } },
+        { email: { $regex: search, $options: 'i' } },
+        { phone: { $regex: search, $options: 'i' } },
+        { tinNumber: { $regex: search, $options: 'i' } }
+      ];
+    }
+    
+    if (email) {
+      filter.email = { $regex: email, $options: 'i' };
+    }
+    
+    // Date range filters
+    if (dateFrom || dateTo) {
+      filter.createdAt = {};
+      if (dateFrom) filter.createdAt.$gte = new Date(dateFrom);
+      if (dateTo) filter.createdAt.$lte = new Date(dateTo);
+    }
+
+    // Sorting
+    const sortOptions = {};
+    sortOptions[sortBy] = sortOrder === 'desc' ? -1 : 1;
+
+    // Pagination
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    const suppliers = await SupplierModal.find(filter)
+      .populate('userId', 'name email')
+      .sort(sortOptions)
+      .skip(skip)
+      .limit(parseInt(limit));
+      
+    const total = await SupplierModal.countDocuments(filter);
+    
+    return res.status(200).json({ 
+      success: true, 
+      suppliers,
+      pagination: {
+        currentPage: parseInt(page),
+        totalPages: Math.ceil(total / parseInt(limit)),
+        totalItems: total,
+        itemsPerPage: parseInt(limit)
+      }
+    });
     
   } catch (error) {
+    console.error("Get suppliers error:", error);
     return res.status(500).json({ success: false, message: "Server error" });
   }
 };

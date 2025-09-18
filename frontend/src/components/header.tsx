@@ -1,7 +1,8 @@
 import React from "react";
 
 import { useAuth } from "@/context/AuthContext";
-import { Bell, LogOut, Menu, User } from "lucide-react";
+import { LogOut, Menu, User } from "lucide-react";
+import NotificationBell from "./NotificationBell";
 import { Button } from "./ui/button";
 
 interface HeaderProps {
@@ -34,9 +35,7 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
         </div>
 
         <div className="flex items-center space-x-4">
-          <Button variant="ghost" size="icon">
-            <Bell className="h-5 w-5" />
-          </Button>
+          <NotificationBell />
 
           <div className="flex items-center space-x-2">
             <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center">

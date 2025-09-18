@@ -21,7 +21,10 @@ const SupplierSchema = new mongoose.Schema({
     tinNumber: { type: String, required: true },
     licenses: [LicenseSchema],
     accounts: [AccountSchema], // Changed to array of accounts
-    createdAt: { type: Date, default: Date.now }
+    userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true }, // Track which user added this supplier
+    isActive: { type: Boolean, default: true },
+    createdAt: { type: Date, default: Date.now },
+    updatedAt: { type: Date, default: Date.now }
 });
 
 const SupplierModal = mongoose.model("Supplier", SupplierSchema);

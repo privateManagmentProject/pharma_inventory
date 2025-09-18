@@ -44,7 +44,8 @@ const createCustomer = async (req, res) => {
       } = req.body;
       
       const existingCustomer = await CustomerModal.findOne({ 
-        $or: [{ phone }, { tinNumber }] 
+        $or: [{ phone }, { tinNumber }],
+        userId: req.user._id
       });
       
       if (existingCustomer) {
@@ -57,6 +58,7 @@ const createCustomer = async (req, res) => {
         path: file.path,
         type: file.mimetype
       })) : [];
+      
       const newCustomer = new CustomerModal({
         name, 
         address, 
@@ -64,35 +66,99 @@ const createCustomer = async (req, res) => {
         tinNumber, 
         phone,
         licenses,
-         description: description || "",
+        description: description || "",
         receiverInfo: {
           name: receiverName,
           phone: receiverPhone,
           address: receiverAddress
         },
-        withhold: withhold === 'true'
+        withhold: withhold === 'true',
+        userId: req.user._id // Track which user created this customer
       });
       
       await newCustomer.save();
-      return res.status(201).json({ success: true, message: "Customer added successfully" });
+      return res.status(201).json({ success: true, message: "Customer added successfully", customer: newCustomer });
     });
   } catch(error) {
+    console.error("Create customer error:", error);
     return res.status(500).json({ success: false, message: "Server error" });
   }
 };
 
 const getCustomers = async(req, res) => {
   try {
-    const {search} = req.query;
-    let filter = {};
-    if(search) {
-      filter.name = { $regex: search, $options: 'i' };
-      
+    const {
+      search,
+      companyName,
+      withhold,
+      dateFrom,
+      dateTo,
+      sortBy = 'createdAt',
+      sortOrder = 'desc',
+      page = 1,
+      limit = 10
+    } = req.query;
+    
+    let filter = { isActive: true };
+    
+    // Role-based filtering
+    if (req.user.role !== 'admin') {
+      filter.userId = req.user._id;
     }
-    const customers = await CustomerModal.find(filter); 
-    return res.status(200).json({ success: true, customers, total: customers.length });
+    
+    // Search filters
+    if (search) {
+      filter.$or = [
+        { name: { $regex: search, $options: 'i' } },
+        { companyName: { $regex: search, $options: 'i' } },
+        { phone: { $regex: search, $options: 'i' } },
+        { tinNumber: { $regex: search, $options: 'i' } }
+      ];
+    }
+    
+    if (companyName) {
+      filter.companyName = { $regex: companyName, $options: 'i' };
+    }
+    
+    if (withhold !== undefined) {
+      filter.withhold = withhold === 'true';
+    }
+    
+    // Date range filters
+    if (dateFrom || dateTo) {
+      filter.createdAt = {};
+      if (dateFrom) filter.createdAt.$gte = new Date(dateFrom);
+      if (dateTo) filter.createdAt.$lte = new Date(dateTo);
+    }
+
+    // Sorting
+    const sortOptions = {};
+    sortOptions[sortBy] = sortOrder === 'desc' ? -1 : 1;
+
+    // Pagination
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    const customers = await CustomerModal.find(filter)
+      .populate('userId', 'name email')
+      .sort(sortOptions)
+      .skip(skip)
+      .limit(parseInt(limit));
+      
+    const total = await CustomerModal.countDocuments(filter);
+    
+    return res.status(200).json({ 
+      success: true, 
+      customers,
+      pagination: {
+        currentPage: parseInt(page),
+        totalPages: Math.ceil(total / parseInt(limit)),
+        totalItems: total,
+        itemsPerPage: parseInt(limit)
+      }
+    });
   
   } catch (error) {
+    console.error("Get customers error:", error);
     return res.status(500).json({ success: false, message: "Server error" });
   }
 };

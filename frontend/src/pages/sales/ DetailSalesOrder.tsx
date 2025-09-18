@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-import { ArrowLeft, Download } from "lucide-react";
+import { ArrowLeft, Download, Filter } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { getSalesOrderById } from "./api/ salesOrderAPI";
@@ -13,6 +13,7 @@ const DetailSalesOrder = () => {
   const { id } = useParams<{ id: string }>();
   const [salesOrder, setSalesOrder] = useState<SalesOrder | null>(null);
   const [loading, setLoading] = useState(true);
+  const [selectedSupplier, setSelectedSupplier] = useState<string | null>(null);
 
   useEffect(() => {
     if (id) {
@@ -71,10 +72,13 @@ const DetailSalesOrder = () => {
     }
   };
 
-  const generatePDF = () => {
+  const generatePDF = (supplierName: string | null = null) => {
     if (!salesOrder) return;
 
     const doc = new jsPDF();
+    const filteredItems = supplierName
+      ? salesOrder.items.filter((item) => item.supplierName === supplierName)
+      : salesOrder.items;
 
     // Add header
     doc.setFontSize(20);
@@ -104,9 +108,14 @@ const DetailSalesOrder = () => {
       76
     );
 
+    // Add filter info if applicable
+    if (supplierName) {
+      doc.text(`Supplier Filter: ${supplierName}`, 20, 84);
+    }
+
     // Customer Information
     autoTable(doc, {
-      startY: 90,
+      startY: supplierName ? 94 : 90,
       head: [["Customer Information"]],
       body: [[`Name: ${salesOrder.customerName}`]],
       theme: "grid",
@@ -120,7 +129,7 @@ const DetailSalesOrder = () => {
     });
 
     // Order Items Table
-    const itemsData = salesOrder.items.map((item) => [
+    const itemsData = filteredItems.map((item) => [
       item.productName,
       `${item.quantity} ${item.packageSize}`,
       `$${item.unitPrice}`,
@@ -165,9 +174,9 @@ const DetailSalesOrder = () => {
       margin: { left: 20, right: 20 },
     });
 
-    // Supplier Breakdown
+    // Supplier Breakdown (only for filtered items if applicable)
     const supplierBreakdown: Record<string, number> = {};
-    salesOrder.items.forEach((item) => {
+    filteredItems.forEach((item) => {
       if (!supplierBreakdown[item.supplierName]) {
         supplierBreakdown[item.supplierName] = 0;
       }
@@ -204,7 +213,14 @@ const DetailSalesOrder = () => {
       );
     }
 
-    doc.save(`sales_order_${salesOrder._id?.slice(-6)}.pdf`);
+    const fileName = supplierName
+      ? `sales_order_${salesOrder._id?.slice(-6)}_${supplierName.replace(
+          /\s+/g,
+          "_"
+        )}.pdf`
+      : `sales_order_${salesOrder._id?.slice(-6)}.pdf`;
+
+    doc.save(fileName);
   };
 
   if (loading) return <div>Loading...</div>;
@@ -214,6 +230,11 @@ const DetailSalesOrder = () => {
     parseFloat(salesOrder.totalAmount) - (salesOrder.paidAmount || 0);
   const paymentStatus = getPaymentStatus(salesOrder);
 
+  // Get unique suppliers for filtering
+  const uniqueSuppliers = Array.from(
+    new Set(salesOrder.items.map((item) => item.supplierName))
+  );
+
   return (
     <div className="container mx-auto p-6">
       <div className="mb-6 flex justify-between">
@@ -222,9 +243,11 @@ const DetailSalesOrder = () => {
             <ArrowLeft className="mr-2 h-4 w-4" /> Back to Sales Orders
           </Button>
         </Link>
-        <Button variant="outline" onClick={generatePDF}>
-          <Download className="mr-2 h-4 w-4" /> Download PDF
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => generatePDF()}>
+            <Download className="mr-2 h-4 w-4" /> Download All
+          </Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
@@ -301,50 +324,83 @@ const DetailSalesOrder = () => {
 
       <Card className="mb-6">
         <CardHeader>
-          <CardTitle>Order Items</CardTitle>
+          <CardTitle className="flex justify-between items-center">
+            <span>Order Items</span>
+            <div className="flex items-center gap-2">
+              <Filter className="h-4 w-4" />
+              <select
+                className="border rounded-md p-1 text-sm"
+                value={selectedSupplier || ""}
+                onChange={(e) => setSelectedSupplier(e.target.value || null)}
+              >
+                <option value="">All Suppliers</option>
+                {uniqueSuppliers.map((supplier) => (
+                  <option key={supplier} value={supplier}>
+                    {supplier}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 gap-4">
-            {salesOrder.items.map((item, index) => (
-              <div key={index} className="p-4 border rounded-md">
-                <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-                  <div>
-                    <h3 className="font-semibold">Product</h3>
-                    <p>{item.productName}</p>
-                    {item.productCategory && (
-                      <p className="text-sm text-muted-foreground">
-                        Category: {item.productCategory}
+            {salesOrder.items
+              .filter(
+                (item) =>
+                  !selectedSupplier || item.supplierName === selectedSupplier
+              )
+              .map((item, index) => (
+                <div key={index} className="p-4 border rounded-md">
+                  <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                    <div>
+                      <h3 className="font-semibold">Product</h3>
+                      <p>{item.productName}</p>
+                      {item.productCategory && (
+                        <p className="text-sm text-muted-foreground">
+                          Category: {item.productCategory}
+                        </p>
+                      )}
+                    </div>
+                    <div>
+                      <h3 className="font-semibold">Quantity</h3>
+                      <p>
+                        {item.quantity} {item.packageSize}
                       </p>
-                    )}
-                  </div>
-                  <div>
-                    <h3 className="font-semibold">Quantity</h3>
-                    <p>
-                      {item.quantity} {item.packageSize}
-                    </p>
-                  </div>
-                  <div>
-                    <h3 className="font-semibold">Unit Price</h3>
-                    <p>${item.unitPrice}</p>
-                  </div>
-                  <div>
-                    <h3 className="font-semibold">Total Price</h3>
-                    <p>${item.totalPrice}</p>
-                  </div>
-                  <div>
-                    <h3 className="font-semibold">Supplier</h3>
-                    <p>{item.supplierName}</p>
+                    </div>
+                    <div>
+                      <h3 className="font-semibold">Unit Price</h3>
+                      <p>${item.unitPrice}</p>
+                    </div>
+                    <div>
+                      <h3 className="font-semibold">Total Price</h3>
+                      <p>${item.totalPrice}</p>
+                    </div>
+                    <div>
+                      <h3 className="font-semibold">Supplier</h3>
+                      <p>{item.supplierName}</p>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              ))}
           </div>
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader>
-          <CardTitle>Supplier Breakdown</CardTitle>
+          <CardTitle className="flex justify-between items-center">
+            <span>Supplier Breakdown</span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => generatePDF(selectedSupplier)}
+              disabled={!selectedSupplier}
+            >
+              <Download className="mr-2 h-4 w-4" /> Download{" "}
+              {selectedSupplier || "Selected"}
+            </Button>
+          </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 gap-4">
@@ -359,15 +415,26 @@ const DetailSalesOrder = () => {
                 );
               });
 
-              return Object.entries(supplierBreakdown).map(([name, total]) => (
-                <div
-                  key={name}
-                  className="p-4 border rounded-md flex justify-between"
-                >
-                  <h3 className="font-semibold">{name}</h3>
-                  <p>${total.toFixed(2)}</p>
-                </div>
-              ));
+              return Object.entries(supplierBreakdown).map(
+                ([name, totalPrice]) => (
+                  <div
+                    key={name}
+                    className="p-4 border rounded-md flex justify-between items-center"
+                  >
+                    <h3 className="font-semibold">{name}</h3>
+                    <div className="flex items-center gap-2">
+                      <p>${totalPrice.toFixed(2)}</p>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => generatePDF(name)}
+                      >
+                        <Download className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                )
+              );
             })()}
           </div>
         </CardContent>

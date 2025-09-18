@@ -17,17 +17,36 @@ const SalesOrderItemSchema = new mongoose.Schema({
 });
 
 const PaymentInfoSchema = new mongoose.Schema({
+  paymentType: { 
+    type: String, 
+    enum: ['one-time', 'two-time', 'date-based'], 
+    default: 'one-time',
+    required: true
+  },
   dueDate: { type: Date, required: true },
+  secondPaymentDate: { type: Date }, // For two-time payments
+  paymentSchedule: [{ // For date-based payments
+    date: { type: Date, required: true },
+    amount: { type: Number, required: true },
+    status: { 
+      type: String, 
+      enum: ['pending', 'paid', 'overdue'], 
+      default: 'pending' 
+    }
+  }],
   status: { 
     type: String, 
     enum: ['pending', 'partial', 'completed', 'overdue'], 
     default: 'pending' 
-  }
+  },
+  totalPaidAmount: { type: Number, default: 0 },
+  remainingAmount: { type: Number }
 });
 
 const SalesOrderSchema = new mongoose.Schema({
   customerId: { type: mongoose.Schema.Types.ObjectId, ref: "Customer", required: true },
   customerName: { type: String, required: true },
+  userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true }, // Track which user created this order
   items: [SalesOrderItemSchema],
   totalAmount: { type: String, required: true },
   paidAmount: { type: Number, default: 0 },
@@ -38,7 +57,9 @@ const SalesOrderSchema = new mongoose.Schema({
     enum: ['pending', 'progress', 'approved', 'rejected', 'completed'], 
     default: 'pending' 
   },
-  createdAt: { type: Date, default: Date.now }
+  notes: { type: String },
+  createdAt: { type: Date, default: Date.now },
+  updatedAt: { type: Date, default: Date.now }
 });
 
 // Pre-save middleware to update payment status and unpaid amount
@@ -46,24 +67,47 @@ SalesOrderSchema.pre('save', function(next) {
   const total = parseFloat(this.totalAmount);
   const paid = this.paidAmount || 0;
   this.unpaidAmount = total - paid;
+  this.updatedAt = new Date();
   
-  // Update payment status
-  if (paid >= total) {
-    this.paymentInfo.status = 'completed';
-    this.status = 'completed';
-  } else if (paid > 0) {
-    this.paymentInfo.status = 'partial';
-    this.status = 'progress';
-  } else {
-    this.paymentInfo.status = 'pending';
-    this.status = 'pending';
-  }
+  // Update payment info
+  if (this.paymentInfo) {
+    this.paymentInfo.totalPaidAmount = paid;
+    this.paymentInfo.remainingAmount = total - paid;
+    
+    // Update payment status based on payment type
+    if (paid >= total) {
+      this.paymentInfo.status = 'completed';
+      this.status = 'completed';
+    } else if (paid > 0) {
+      this.paymentInfo.status = 'partial';
+      this.status = 'progress';
+    } else {
+      this.paymentInfo.status = 'pending';
+      this.status = 'pending';
+    }
 
-  // Check if overdue
-  const today = new Date();
-  const dueDate = new Date(this.paymentInfo.dueDate);
-  if (this.paymentInfo.status !== 'completed' && today > dueDate) {
-    this.paymentInfo.status = 'overdue';
+    // Check if overdue based on payment type
+    const today = new Date();
+    let isOverdue = false;
+    
+    if (this.paymentInfo.paymentType === 'one-time') {
+      const dueDate = new Date(this.paymentInfo.dueDate);
+      isOverdue = this.paymentInfo.status !== 'completed' && today > dueDate;
+    } else if (this.paymentInfo.paymentType === 'two-time') {
+      const firstDue = new Date(this.paymentInfo.dueDate);
+      const secondDue = new Date(this.paymentInfo.secondPaymentDate);
+      isOverdue = (this.paymentInfo.status !== 'completed' && today > firstDue) || 
+                  (this.paymentInfo.status !== 'completed' && today > secondDue);
+    } else if (this.paymentInfo.paymentType === 'date-based') {
+      // Check if any scheduled payment is overdue
+      isOverdue = this.paymentInfo.paymentSchedule.some(schedule => 
+        schedule.status === 'pending' && today > schedule.date
+      );
+    }
+    
+    if (isOverdue) {
+      this.paymentInfo.status = 'overdue';
+    }
   }
   
   next();
