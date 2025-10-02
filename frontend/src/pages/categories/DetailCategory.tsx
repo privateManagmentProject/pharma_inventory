@@ -1,7 +1,9 @@
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -26,31 +28,51 @@ const DetailCategory: React.FC<DetailCategoryProps> = ({
 }) => {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md rounded-lg bg-white dark:bg-gray-800 shadow-xl">
         <DialogHeader>
-          <DialogTitle>Category Details</DialogTitle>
+          <DialogTitle className="text-2xl font-bold text-gray-900 dark:text-white">
+            Category Details
+          </DialogTitle>
+          <DialogDescription className="text-gray-600 dark:text-gray-400">
+            View category information
+          </DialogDescription>
         </DialogHeader>
-        <div className="space-y-4">
-          <div>
-            <h3 className="font-semibold">Category Name</h3>
-            <p className="text-gray-700 dark:text-gray-300">
-              {category.categoryName}
-            </p>
-          </div>
-          <div>
-            <h3 className="font-semibold">Description</h3>
-            <p className="text-gray-700 dark:text-gray-300">
-              {category.categoryDescription}
-            </p>
-          </div>
-          <div className="flex justify-end pt-4">
-            <Button variant="outline" onClick={() => onOpenChange(false)}>
-              Close
-            </Button>
-          </div>
+        <Card className="border-0">
+          <CardContent className="space-y-6 pt-4">
+            <div>
+              <CardHeader className="p-0">
+                <CardTitle className="text-sm font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+                  Category Name
+                </CardTitle>
+              </CardHeader>
+              <p className="text-lg font-medium text-gray-900 dark:text-white">
+                {category.categoryName}
+              </p>
+            </div>
+            <div>
+              <CardHeader className="p-0">
+                <CardTitle className="text-sm font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+                  Description
+                </CardTitle>
+              </CardHeader>
+              <p className="text-gray-700 dark:text-gray-300 leading-relaxed">
+                {category.categoryDescription}
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+        <div className="flex justify-end pt-6">
+          <Button
+            variant="outline"
+            onClick={() => onOpenChange(false)}
+            className="w-full sm:w-auto px-6 py-2 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+          >
+            Close
+          </Button>
         </div>
       </DialogContent>
     </Dialog>
   );
 };
+
 export default DetailCategory;

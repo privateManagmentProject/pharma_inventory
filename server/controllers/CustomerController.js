@@ -1,7 +1,7 @@
 import multer from "multer";
 import path from "path";
 import CustomerModal from "../models/Customer.js";
-
+import { exportCustomersToExcel, importCustomersFromExcel } from "../util/customerImportExport.js";
 // Configure multer for file uploads
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
@@ -22,6 +22,154 @@ const upload = multer({
     }
   }
 }).array('licenses', 5);
+const importCustomers = async (req, res) => {
+  try {
+    console.log('Import request received, file:', req.file);
+    
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: "No file uploaded" });
+    }
+
+    const result = await importCustomersFromExcel(req.file.buffer, req.user._id);
+    
+    return res.status(200).json({
+      success: true,
+      message: `Import completed. Successfully imported ${result.importedCount} customers. ${result.errorCount} errors occurred.`,
+      ...result
+    });
+  } catch (error) {
+    console.error("Import customers error:", error);
+    return res.status(500).json({ 
+      success: false, 
+      message: error.message || "Failed to import customers" 
+    });
+  }
+};
+
+// Update export function with better error handling
+const exportCustomers = async (req, res) => {
+  try {
+    console.log('Export request received for user:', req.user._id);
+    
+    const excelBuffer = await exportCustomersToExcel(req.user._id);
+    
+    if (!excelBuffer || excelBuffer.length === 0) {
+      return res.status(404).json({ 
+        success: false, 
+        message: "No data available to export" 
+      });
+    }
+    
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename=customers-${Date.now()}.xlsx`);
+    res.setHeader('Content-Length', excelBuffer.length);
+    
+    console.log('Sending Excel file, size:', excelBuffer.length);
+    return res.send(excelBuffer);
+  } catch (error) {
+    console.error("Export customers error:", error);
+    return res.status(500).json({ 
+      success: false, 
+      message: error.message || "Failed to export customers" 
+    });
+  }
+};
+const importCustomersBulk = async (req, res) => {
+  try {
+    const { customers } = req.body;
+    const userId = req.user._id;
+
+    console.log('Bulk import request received for:', customers?.length, 'customers');
+
+    if (!customers || !Array.isArray(customers)) {
+      return res.status(400).json({ 
+        success: false, 
+        message: "Invalid customer data" 
+      });
+    }
+
+    const importedCustomers = [];
+    const errors = [];
+
+    // Use bulk insert for better performance
+    const customerPromises = customers.map(async (customerData, index) => {
+      try {
+        // Extract phone numbers
+        const contactNumbers = customerData.Contact ? 
+          customerData.Contact.toString().split('/').map(num => num.trim()).filter(num => num.length > 0) 
+          : [];
+        
+        const primaryPhone = contactNumbers[0] || `NO_PHONE_${Date.now()}_${index}`;
+
+        // Generate TIN number
+        const tinNumber = `TIN_${customerData.Customer.replace(/\s+/g, '_').toUpperCase()}_${Date.now()}_${index}`;
+
+        // Check for duplicates
+        const existingCustomer = await CustomerModal.findOne({
+          $or: [
+            { phone: primaryPhone, userId },
+            { name: customerData.Customer.trim(), userId }
+          ]
+        });
+
+        if (existingCustomer) {
+          throw new Error(`Customer already exists: ${customerData.Customer}`);
+        }
+
+        // Create customer object
+        const customer = {
+          name: customerData.Customer.trim(),
+          address: customerData.City?.toString()?.trim() || 'Not specified',
+          companyName: customerData.Customer.trim(),
+          tinNumber: tinNumber,
+          phone: primaryPhone,
+          description: customerData.Remark?.toString()?.trim() || '',
+          licenses: [],
+          receiverInfo: {
+            name: customerData['Contact Person']?.toString()?.trim() || customerData.Customer.trim(),
+            phone: primaryPhone,
+            address: customerData.City?.toString()?.trim() || 'Not specified'
+          },
+          withhold: false,
+          userId: userId
+        };
+
+        return customer;
+      } catch (error) {
+        errors.push(`Customer "${customerData.Customer}": ${error.message}`);
+        return null;
+      }
+    });
+
+    // Wait for all customer objects to be created
+    const customerObjects = await Promise.all(customerPromises);
+    const validCustomers = customerObjects.filter(customer => customer !== null);
+
+    // Bulk insert valid customers
+    if (validCustomers.length > 0) {
+      const result = await CustomerModal.insertMany(validCustomers, { ordered: false });
+      importedCustomers.push(...result);
+      console.log(`Successfully imported ${result.length} customers`);
+    }
+
+    const result = {
+      success: true,
+      importedCount: importedCustomers.length,
+      errorCount: errors.length,
+      errors,
+      importedCustomers: importedCustomers.map(c => ({ id: c._id, name: c.name }))
+    };
+
+    return res.status(200).json(result);
+
+  } catch (error) {
+    console.error("Bulk import error:", error);
+    return res.status(500).json({ 
+      success: false, 
+      message: error.message || "Failed to import customers" 
+    });
+  }
+};
 
 const createCustomer = async (req, res) => {
   try {
@@ -87,76 +235,21 @@ const createCustomer = async (req, res) => {
 
 const getCustomers = async(req, res) => {
   try {
-    const {
-      search,
-      companyName,
-      withhold,
-      dateFrom,
-      dateTo,
-      sortBy = 'createdAt',
-      sortOrder = 'desc',
-      page = 1,
-      limit = 10
-    } = req.query;
+    const { search } = req.query;
+     let filter= {}
+   if(search){
+     filter={
+       $or: [
+         { name: { $regex: search, $options: 'i' } },
+         { companyName: { $regex: search, $options: 'i' } },
+         { phone: { $regex: search, $options: 'i' } },
+         { tinNumber: { $regex: search, $options: 'i' } }
+       ]
+     }
+   }
     
-    let filter = { isActive: true };
-    
-    // Role-based filtering
-    if (req.user.role !== 'admin') {
-      filter.userId = req.user._id;
-    }
-    
-    // Search filters
-    if (search) {
-      filter.$or = [
-        { name: { $regex: search, $options: 'i' } },
-        { companyName: { $regex: search, $options: 'i' } },
-        { phone: { $regex: search, $options: 'i' } },
-        { tinNumber: { $regex: search, $options: 'i' } }
-      ];
-    }
-    
-    if (companyName) {
-      filter.companyName = { $regex: companyName, $options: 'i' };
-    }
-    
-    if (withhold !== undefined) {
-      filter.withhold = withhold === 'true';
-    }
-    
-    // Date range filters
-    if (dateFrom || dateTo) {
-      filter.createdAt = {};
-      if (dateFrom) filter.createdAt.$gte = new Date(dateFrom);
-      if (dateTo) filter.createdAt.$lte = new Date(dateTo);
-    }
-
-    // Sorting
-    const sortOptions = {};
-    sortOptions[sortBy] = sortOrder === 'desc' ? -1 : 1;
-
-    // Pagination
-    const skip = (parseInt(page) - 1) * parseInt(limit);
-
-    const customers = await CustomerModal.find(filter)
-      .populate('userId', 'name email')
-      .sort(sortOptions)
-      .skip(skip)
-      .limit(parseInt(limit));
-      
-    const total = await CustomerModal.countDocuments(filter);
-    
-    return res.status(200).json({ 
-      success: true, 
-      customers,
-      pagination: {
-        currentPage: parseInt(page),
-        totalPages: Math.ceil(total / parseInt(limit)),
-        totalItems: total,
-        itemsPerPage: parseInt(limit)
-      }
-    });
-  
+    const customers = await CustomerModal.find(filter);
+    return res.status(200).json({ success: true, customers, total: customers.length });
   } catch (error) {
     console.error("Get customers error:", error);
     return res.status(500).json({ success: false, message: "Server error" });
@@ -259,5 +352,5 @@ const getCustomerById = async (req, res) => {
   }
 };
 
-export { createCustomer, deleteCustomer, getCustomerById, getCustomers, updateCustomer };
+export { createCustomer, deleteCustomer, exportCustomers, getCustomerById, getCustomers, importCustomers, importCustomersBulk, updateCustomer };
 

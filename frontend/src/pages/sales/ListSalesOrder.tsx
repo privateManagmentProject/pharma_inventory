@@ -1,4 +1,6 @@
+import AdvancedFilter from "@/components/AdvancedFilter";
 import { DataTable } from "@/components/DataTable";
+import { filterIcons, salesOrderFilters } from "@/components/filterConfigs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -19,16 +21,28 @@ const ListSalesOrder = () => {
   const [loading, setLoading] = useState(true);
   const [sorting, setSorting] = useState<SortingState>([]);
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 10 });
-
-  useEffect(() => {
-    fetchSalesOrders();
-  }, []);
-
+  const [filters, setFilters] = useState<Record<string, any>>({});
   const fetchSalesOrders = async () => {
     try {
       const params = new URLSearchParams();
+
+      // Add search term if exists
       if (searchTerm) params.append("search", searchTerm);
-      if (statusFilter) params.append("status", statusFilter);
+
+      // Add filters
+      Object.entries(filters).forEach(([key, value]) => {
+        if (value) {
+          if (key === "createdAt" && value.from && value.to) {
+            params.append("dateFrom", value.from);
+            params.append("dateTo", value.to);
+          } else if (key === "totalAmount" && (value.min || value.max)) {
+            if (value.min) params.append("minAmount", value.min);
+            if (value.max) params.append("maxAmount", value.max);
+          } else if (typeof value === "string" && value.trim() !== "") {
+            params.append(key, value);
+          }
+        }
+      });
 
       const response = await getSalesOrders(params.toString());
       setSalesOrders(response.salesOrders);
@@ -38,6 +52,11 @@ const ListSalesOrder = () => {
       setLoading(false);
     }
   };
+
+  // Call fetchSalesOrders when filters change
+  useEffect(() => {
+    fetchSalesOrders();
+  }, [filters]);
 
   const handleDelete = async (id: string) => {
     if (window.confirm("Are you sure you want to delete this sales order?")) {
@@ -325,7 +344,13 @@ const ListSalesOrder = () => {
           <Plus className="mr-2 h-4 w-4" /> New Sales Order
         </Button>
       </div>
-
+      <AdvancedFilter
+        filters={salesOrderFilters}
+        onFilterChange={setFilters}
+        onClearFilters={() => setFilters({})}
+        title="Sales Order Filters"
+        icon={filterIcons.salesOrders}
+      />
       <Card className="shadow-md bg-white dark:bg-gray-800">
         <CardContent className="p-0">
           <DataTable

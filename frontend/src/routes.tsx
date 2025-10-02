@@ -1,3 +1,4 @@
+import { Navigate, type RouteObject } from "react-router-dom";
 import Layout from "./components/Layout";
 import { useAuth } from "./context/AuthContext";
 import ListCategory from "./pages/categories/ListCategory";
@@ -11,6 +12,7 @@ import ListSuppliers from "./pages/suppliers/ListSuppliers";
 import Login from "./pages/users/Login";
 
 // Protected Route component
+// eslint-disable-next-line react-refresh/only-export-components
 const ProtectedRoute: React.FC<{
   children: React.ReactNode;
   requiredRole?: string;

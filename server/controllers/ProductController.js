@@ -1,8 +1,6 @@
 import multer from "multer";
 import path from "path";
-import CategoryModal from "../models/Category.js";
 import ProductModal from "../models/Product.js";
-import SupplierModal from "../models/Supplier.js";
 
 // Configure multer for file uploads
 const storage = multer.diskStorage({
@@ -66,109 +64,73 @@ const createProduct = async (req, res) => {
 };
 
 const getProducts = async(req, res) => {
-  try {
-    const { 
-      search, 
-      category, 
-      supplier, 
-      minPrice, 
-      maxPrice, 
-      minStock, 
-      maxStock, 
-      expiryDateFrom, 
-      expiryDateTo,
-      packageSize,
-      manufacturer,
-      sortBy = 'createdAt',
-      sortOrder = 'desc',
-      page = 1,
-      limit = 10
-    } = req.query;
-    
-    let filter = { isActive: true };
-    
-    // Role-based filtering
-    if (req.user.role !== 'admin') {
-      filter.userId = req.user._id;
-    }
-    
-    // Search filters
-    if(search) {
-      filter.$or = [
+ try {  
+  const { search, category, supplier, minPrice, maxPrice, minStock, maxStock, expiryDateFrom, expiryDateTo, packageSize, manufacturer, sortBy = 'createdAt', sortOrder = 'desc', page = 1, limit = 10 } = req.query;
+  let filter = {};
+  if(search){
+    filter={
+      $or: [
         { name: { $regex: search, $options: 'i' } },
         { brandName: { $regex: search, $options: 'i' } },
         { description: { $regex: search, $options: 'i' } }
-      ];
+      ]
     }
-    if(category) {
-      filter.categoryId = category;
-    }
-    if(supplier) {
-      filter.supplierId = supplier;
-    }
-    if(packageSize) {
-      filter.packageSize = packageSize;
-    }
-    if(manufacturer) {
-      filter.manufacturer = { $regex: manufacturer, $options: 'i' };
-    }
-    
-    // Price range filters
-    if(minPrice || maxPrice) {
-      filter.price = {};
-      if(minPrice) filter.price.$gte = minPrice;
-      if(maxPrice) filter.price.$lte = maxPrice;
-    }
-    
-    // Stock range filters
-    if(minStock || maxStock) {
-      filter.stock = {};
-      if(minStock) filter.stock.$gte = minStock;
-      if(maxStock) filter.stock.$lte = maxStock;
-    }
-    
-    // Expiry date filters
-    if(expiryDateFrom || expiryDateTo) {
-      filter.expiryDate = {};
-      if(expiryDateFrom) filter.expiryDate.$gte = new Date(expiryDateFrom);
-      if(expiryDateTo) filter.expiryDate.$lte = new Date(expiryDateTo);
-    }
-
-    // Sorting
-    const sortOptions = {};
-    sortOptions[sortBy] = sortOrder === 'desc' ? -1 : 1;
-
-    // Pagination
-    const skip = (parseInt(page) - 1) * parseInt(limit);
-
-    const products = await ProductModal.find(filter)
-      .populate('categoryId', 'name')
-      .populate('supplierId', 'name email')
-      .populate('userId', 'name email')
-      .sort(sortOptions)
-      .skip(skip)
-      .limit(parseInt(limit));
-      
-    const total = await ProductModal.countDocuments(filter);
-    const categories = await CategoryModal.find({ isActive: true });
-    const suppliers = await SupplierModal.find({ isActive: true });
-    
-    return res.status(200).json({ 
-      success: true, 
-      products, 
-      categories, 
-      suppliers,
-      pagination: {
-        currentPage: parseInt(page),
-        totalPages: Math.ceil(total / parseInt(limit)),
-        totalItems: total,
-        itemsPerPage: parseInt(limit)
-      }
-    });
-  } catch (error) {
-    console.error("Get products error:", error);
-    return res.status(500).json({ success: false, message: "Server error"});
   }
+  if(category){
+    filter.categoryId = category;
+  }
+  if(supplier){
+    filter.supplierId = supplier;
+  }
+  if(packageSize){
+    filter.packageSize = packageSize;
+  }
+  if(manufacturer){
+    filter.manufacturer = { $regex: manufacturer, $options: 'i' };
+  }
+  // Price range filters
+  if(minPrice || maxPrice){
+    filter.price = {};
+    if(minPrice) filter.price.$gte = minPrice;
+    if(maxPrice) filter.price.$lte = maxPrice;
+  }
+  
+  // Stock range filters
+  if(minStock || maxStock){
+    filter.stock = {};
+    if(minStock) filter.stock.$gte = minStock;
+    if(maxStock) filter.stock.$lte = maxStock;
+  }
+  
+  // Expiry date filters
+  if(expiryDateFrom || expiryDateTo){
+    filter.expiryDate = {};
+    if(expiryDateFrom) filter.expiryDate.$gte = new Date(expiryDateFrom);
+    if(expiryDateTo) filter.expiryDate.$lte = new Date(expiryDateTo);
+  }
+
+  // Sorting
+  const sortOptions = {};
+  sortOptions[sortBy] = sortOrder === 'desc' ? -1 : 1;
+
+  // Pagination
+  const skip = (parseInt(page) - 1) * parseInt(limit);
+
+  const products = await ProductModal.find(filter)
+    .populate('categoryId', 'name')
+    .populate('supplierId', 'name email')
+    .sort(sortOptions)
+    .skip(skip)
+    .limit(parseInt(limit));
+  
+  const total = await ProductModal.countDocuments(filter);
+  
+  return res.status(200).json({ success: true, products, total, page: parseInt(page), pages: Math.ceil(total / parseInt(limit)) });
+ } catch (error) {
+  console.error("Get products error:", error);
+  return res.status(500).json({ success: false, message: "Server error" });
+ }
+   
 };
 
 const updateProduct = async (req, res) => {
