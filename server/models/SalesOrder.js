@@ -46,7 +46,7 @@ const PaymentInfoSchema = new mongoose.Schema({
 const SalesOrderSchema = new mongoose.Schema({
   customerId: { type: mongoose.Schema.Types.ObjectId, ref: "Customer", required: true },
   customerName: { type: String, required: true },
-  userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true }, // Track which user created this order
+  // REMOVED userId field
   items: [SalesOrderItemSchema],
   totalAmount: { type: String, required: true },
   paidAmount: { type: Number, default: 0 },
@@ -69,7 +69,7 @@ SalesOrderSchema.pre('save', function(next) {
   this.unpaidAmount = total - paid;
   this.updatedAt = new Date();
   
-  // Update payment info
+  // Update payment info - FIX: Check if paymentInfo exists
   if (this.paymentInfo) {
     this.paymentInfo.totalPaidAmount = paid;
     this.paymentInfo.remainingAmount = total - paid;
@@ -90,15 +90,17 @@ SalesOrderSchema.pre('save', function(next) {
     const today = new Date();
     let isOverdue = false;
     
-    if (this.paymentInfo.paymentType === 'one-time') {
+    const paymentType = this.paymentInfo.paymentType || 'one-time';
+    
+    if (paymentType === 'one-time' && this.paymentInfo.dueDate) {
       const dueDate = new Date(this.paymentInfo.dueDate);
       isOverdue = this.paymentInfo.status !== 'completed' && today > dueDate;
-    } else if (this.paymentInfo.paymentType === 'two-time') {
+    } else if (paymentType === 'two-time' && this.paymentInfo.secondPaymentDate) {
       const firstDue = new Date(this.paymentInfo.dueDate);
       const secondDue = new Date(this.paymentInfo.secondPaymentDate);
       isOverdue = (this.paymentInfo.status !== 'completed' && today > firstDue) || 
                   (this.paymentInfo.status !== 'completed' && today > secondDue);
-    } else if (this.paymentInfo.paymentType === 'date-based') {
+    } else if (paymentType === 'date-based' && this.paymentInfo.paymentSchedule) {
       // Check if any scheduled payment is overdue
       isOverdue = this.paymentInfo.paymentSchedule.some(schedule => 
         schedule.status === 'pending' && today > schedule.date

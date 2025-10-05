@@ -1,6 +1,7 @@
 import CustomerModal from "../models/Customer.js";
 import ProductModal from "../models/Product.js";
 import SalesOrderModal from "../models/SalesOrder.js";
+
 const createSalesOrder = async (req, res) => {
   try {
     const { 
@@ -32,7 +33,7 @@ const createSalesOrder = async (req, res) => {
       if (parseInt(product.stock) < parseInt(item.quantity)) {
         return res.status(400).json({ 
           success: false, 
-          message: `Insufficient stock for ${product.name}` 
+          message: `Insufficient stock for ${product.name}. Available: ${product.stock}, Requested: ${item.quantity}` 
         });
       }
       
@@ -71,7 +72,6 @@ const createSalesOrder = async (req, res) => {
     const newSalesOrder = new SalesOrderModal({
       customerId,
       customerName: customer.name,
-      userId: req.user._id, // Track which user created this order
       items: orderItems,
       totalAmount: totalAmount.toFixed(2),
       paymentInfo: processedPaymentInfo,
@@ -115,11 +115,6 @@ const getSalesOrders = async (req, res) => {
         
         let filter = {};
         
-        // Role-based filtering
-        if (req.user.role !== 'admin') {
-            filter.userId = req.user._id;
-        }
-        
         // Status filters
         if (status) filter.status = status;
         if (customerName) filter.customerName = { $regex: customerName, $options: 'i' };
@@ -143,8 +138,8 @@ const getSalesOrders = async (req, res) => {
         // Amount range filters
         if (minAmount || maxAmount) {
             filter.totalAmount = {};
-            if (minAmount) filter.totalAmount.$gte = minAmount;
-            if (maxAmount) filter.totalAmount.$lte = maxAmount;
+            if (minAmount) filter.totalAmount.$gte = parseFloat(minAmount);
+            if (maxAmount) filter.totalAmount.$lte = parseFloat(maxAmount);
         }
 
         // Sorting
@@ -156,7 +151,6 @@ const getSalesOrders = async (req, res) => {
 
         const salesOrders = await SalesOrderModal.find(filter)
             .populate('customerId', 'name companyName phone')
-            .populate('userId', 'name email')
             .populate('items.productId', 'name brandName')
             .populate('items.supplierId', 'name')
             .sort(sortOptions)
@@ -181,6 +175,115 @@ const getSalesOrders = async (req, res) => {
     }
 };
 
+const addPayment = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { amount, paymentDate, notes } = req.body;
+
+        const salesOrder = await SalesOrderModal.findById(id);
+        if (!salesOrder) {
+            return res.status(404).json({ success: false, message: "Sales order not found" });
+        }
+
+        const paymentAmount = parseFloat(amount);
+        const totalAmount = parseFloat(salesOrder.totalAmount);
+        const currentPaidAmount = salesOrder.paidAmount || 0;
+        const newPaidAmount = currentPaidAmount + paymentAmount;
+
+        // Update payment info based on payment type
+        if (salesOrder.paymentInfo && salesOrder.paymentInfo.paymentType === 'date-based') {
+            // Find the next unpaid scheduled payment
+            const unpaidSchedule = salesOrder.paymentInfo.paymentSchedule.find(
+                schedule => schedule.status === 'pending'
+            );
+            
+            if (unpaidSchedule) {
+                unpaidSchedule.status = 'paid';
+                unpaidSchedule.paidDate = paymentDate || new Date();
+            }
+        }
+
+        // Update sales order
+        salesOrder.paidAmount = newPaidAmount;
+        
+        // Ensure paymentInfo exists before updating
+        if (!salesOrder.paymentInfo) {
+            salesOrder.paymentInfo = {
+                paymentType: 'one-time',
+                status: 'pending',
+                totalPaidAmount: 0,
+                remainingAmount: totalAmount
+            };
+        }
+        
+        salesOrder.paymentInfo.totalPaidAmount = newPaidAmount;
+        salesOrder.paymentInfo.remainingAmount = totalAmount - newPaidAmount;
+
+        // Update status based on payment
+        if (newPaidAmount >= totalAmount) {
+            salesOrder.paymentInfo.status = 'completed';
+            salesOrder.status = 'completed';
+        } else if (newPaidAmount > 0) {
+            salesOrder.paymentInfo.status = 'partial';
+            salesOrder.status = 'progress';
+        }
+
+        // Check if overdue
+        const today = new Date();
+        if (salesOrder.paymentInfo.paymentType === 'one-time' && salesOrder.paymentInfo.dueDate) {
+            const dueDate = new Date(salesOrder.paymentInfo.dueDate);
+            if (salesOrder.paymentInfo.status !== 'completed' && today > dueDate) {
+                salesOrder.paymentInfo.status = 'overdue';
+            }
+        } else if (salesOrder.paymentInfo.paymentType === 'two-time' && salesOrder.paymentInfo.secondPaymentDate) {
+            const firstDue = new Date(salesOrder.paymentInfo.dueDate);
+            const secondDue = new Date(salesOrder.paymentInfo.secondPaymentDate);
+            if (salesOrder.paymentInfo.status !== 'completed' && (today > firstDue || today > secondDue)) {
+                salesOrder.paymentInfo.status = 'overdue';
+            }
+        }
+
+        await salesOrder.save();
+
+        return res.status(200).json({
+            success: true,
+            message: "Payment added successfully",
+            salesOrder
+        });
+
+    } catch (error) {
+        console.error("Add payment error:", error);
+        return res.status(500).json({ success: false, message: "Server error" });
+    }
+};
+
+const getPaymentSchedule = async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        const salesOrder = await SalesOrderModal.findById(id);
+        if (!salesOrder) {
+            return res.status(404).json({ success: false, message: "Sales order not found" });
+        }
+
+        const paymentSchedule = salesOrder.paymentInfo?.paymentSchedule || [];
+        const totalAmount = parseFloat(salesOrder.totalAmount);
+        const paidAmount = salesOrder.paidAmount || 0;
+
+        return res.status(200).json({
+            success: true,
+            paymentSchedule,
+            totalAmount,
+            paidAmount,
+            remainingAmount: totalAmount - paidAmount,
+            paymentType: salesOrder.paymentInfo?.paymentType || 'one-time'
+        });
+
+    } catch (error) {
+        console.error("Get payment schedule error:", error);
+        return res.status(500).json({ success: false, message: "Server error" });
+    }
+};
 
 const updateSalesOrder = async (req, res) => {
     try {
@@ -204,20 +307,28 @@ const updateSalesOrder = async (req, res) => {
             const totalAmount = parseFloat(salesOrder.totalAmount);
             if (salesOrder.paidAmount >= totalAmount) {
                 salesOrder.status = 'completed';
-                salesOrder.paymentInfo.status = 'completed';
+                if (salesOrder.paymentInfo) {
+                    salesOrder.paymentInfo.status = 'completed';
+                }
             } else if (salesOrder.paidAmount > 0) {
                 salesOrder.status = 'progress';
-                salesOrder.paymentInfo.status = 'partial';
+                if (salesOrder.paymentInfo) {
+                    salesOrder.paymentInfo.status = 'partial';
+                }
             } else {
                 salesOrder.status = 'pending';
-                salesOrder.paymentInfo.status = 'pending';
+                if (salesOrder.paymentInfo) {
+                    salesOrder.paymentInfo.status = 'pending';
+                }
             }
             
             // Check if overdue
             const today = new Date();
-            const dueDate = new Date(salesOrder.paymentInfo.dueDate);
-            if (salesOrder.paymentInfo.status !== 'completed' && today > dueDate) {
-                salesOrder.paymentInfo.status = 'overdue';
+            if (salesOrder.paymentInfo && salesOrder.paymentInfo.dueDate) {
+                const dueDate = new Date(salesOrder.paymentInfo.dueDate);
+                if (salesOrder.paymentInfo.status !== 'completed' && today > dueDate) {
+                    salesOrder.paymentInfo.status = 'overdue';
+                }
             }
         }
 
@@ -228,7 +339,9 @@ const updateSalesOrder = async (req, res) => {
             // If manually approved, set paid amount to full price
             if (status === 'approved' || status === 'completed') {
                 salesOrder.paidAmount = parseFloat(salesOrder.totalAmount);
-                salesOrder.paymentInfo.status = 'completed';
+                if (salesOrder.paymentInfo) {
+                    salesOrder.paymentInfo.status = 'completed';
+                }
             }
         }
 
@@ -305,7 +418,9 @@ const updateSalesOrderStatus = async (req, res) => {
             
             // Set paid amount to full price if approving
             salesOrder.paidAmount = parseFloat(salesOrder.totalAmount);
-            salesOrder.paymentInfo.status = 'completed';
+            if (salesOrder.paymentInfo) {
+                salesOrder.paymentInfo.status = 'completed';
+            }
         }
 
         // If rejecting an approved order, restock the product
@@ -321,7 +436,9 @@ const updateSalesOrderStatus = async (req, res) => {
             
             // Reset paid amount if rejecting
             salesOrder.paidAmount = 0;
-            salesOrder.paymentInfo.status = 'pending';
+            if (salesOrder.paymentInfo) {
+                salesOrder.paymentInfo.status = 'pending';
+            }
         }
 
         await salesOrder.save();
@@ -373,121 +490,9 @@ const getSalesOrderById = async (req, res) => {
   }
 };
 
-// Add payment to sales order
-const addPayment = async (req, res) => {
-    try {
-        const { id } = req.params;
-        const { amount, paymentDate, notes } = req.body;
-
-        const salesOrder = await SalesOrderModal.findById(id);
-        if (!salesOrder) {
-            return res.status(404).json({ success: false, message: "Sales order not found" });
-        }
-
-        // Role-based access control
-        if (req.user.role !== 'admin' && salesOrder.userId.toString() !== req.user._id.toString()) {
-            return res.status(403).json({ success: false, message: "Access denied" });
-        }
-
-        const paymentAmount = parseFloat(amount);
-        const totalAmount = parseFloat(salesOrder.totalAmount);
-        const currentPaidAmount = salesOrder.paidAmount || 0;
-        const newPaidAmount = currentPaidAmount + paymentAmount;
-
-        // Update payment info based on payment type
-        if (salesOrder.paymentInfo.paymentType === 'date-based') {
-            // Find the next unpaid scheduled payment
-            const unpaidSchedule = salesOrder.paymentInfo.paymentSchedule.find(
-                schedule => schedule.status === 'pending'
-            );
-            
-            if (unpaidSchedule) {
-                unpaidSchedule.status = 'paid';
-                unpaidSchedule.paidDate = paymentDate || new Date();
-            }
-        }
-
-        // Update sales order
-        salesOrder.paidAmount = newPaidAmount;
-        salesOrder.paymentInfo.totalPaidAmount = newPaidAmount;
-        salesOrder.paymentInfo.remainingAmount = totalAmount - newPaidAmount;
-
-        // Update status based on payment
-        if (newPaidAmount >= totalAmount) {
-            salesOrder.paymentInfo.status = 'completed';
-            salesOrder.status = 'completed';
-        } else if (newPaidAmount > 0) {
-            salesOrder.paymentInfo.status = 'partial';
-            salesOrder.status = 'progress';
-        }
-
-        // Check if overdue
-        const today = new Date();
-        if (salesOrder.paymentInfo.paymentType === 'one-time') {
-            const dueDate = new Date(salesOrder.paymentInfo.dueDate);
-            if (salesOrder.paymentInfo.status !== 'completed' && today > dueDate) {
-                salesOrder.paymentInfo.status = 'overdue';
-            }
-        } else if (salesOrder.paymentInfo.paymentType === 'two-time') {
-            const firstDue = new Date(salesOrder.paymentInfo.dueDate);
-            const secondDue = new Date(salesOrder.paymentInfo.secondPaymentDate);
-            if (salesOrder.paymentInfo.status !== 'completed' && (today > firstDue || today > secondDue)) {
-                salesOrder.paymentInfo.status = 'overdue';
-            }
-        }
-
-        await salesOrder.save();
-
-        return res.status(200).json({
-            success: true,
-            message: "Payment added successfully",
-            salesOrder
-        });
-
-    } catch (error) {
-        console.error("Add payment error:", error);
-        return res.status(500).json({ success: false, message: "Server error" });
-    }
-};
-
-// Get payment schedule for date-based payments
-const getPaymentSchedule = async (req, res) => {
-    try {
-        const { id } = req.params;
-
-        const salesOrder = await SalesOrderModal.findById(id);
-        if (!salesOrder) {
-            return res.status(404).json({ success: false, message: "Sales order not found" });
-        }
-
-        // Role-based access control
-        if (req.user.role !== 'admin' && salesOrder.userId.toString() !== req.user._id.toString()) {
-            return res.status(403).json({ success: false, message: "Access denied" });
-        }
-
-        const paymentSchedule = salesOrder.paymentInfo.paymentSchedule || [];
-        const totalAmount = parseFloat(salesOrder.totalAmount);
-        const paidAmount = salesOrder.paidAmount || 0;
-
-        return res.status(200).json({
-            success: true,
-            paymentSchedule,
-            totalAmount,
-            paidAmount,
-            remainingAmount: totalAmount - paidAmount,
-            paymentType: salesOrder.paymentInfo.paymentType
-        });
-
-    } catch (error) {
-        console.error("Get payment schedule error:", error);
-        return res.status(500).json({ success: false, message: "Server error" });
-    }
-};
-
 export {
-  addPayment, createSalesOrder, getPaymentSchedule, getSalesOrderById,
-  getSalesOrders,
-  updateSalesOrder,
-  updateSalesOrderStatus
+    addPayment, createSalesOrder, getPaymentSchedule, getSalesOrderById,
+    getSalesOrders,
+    updateSalesOrder,
+    updateSalesOrderStatus
 };
-

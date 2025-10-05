@@ -26,7 +26,10 @@ import { createSalesOrder } from "./api/ salesOrderAPI";
 
 const validationSchema = Yup.object({
   customerId: Yup.string().required("Customer is required"),
-  paymentDueDate: Yup.date().required("Payment due date is required"),
+  paymentInfo: Yup.object({
+    paymentType: Yup.string().required("Payment type is required"),
+    dueDate: Yup.date().required("Payment due date is required"),
+  }),
   items: Yup.array()
     .of(
       Yup.object().shape({
@@ -102,7 +105,21 @@ const NewSalesOrder = () => {
 
   const handleSubmit = async (values: any) => {
     try {
-      await createSalesOrder(values);
+      // Prepare the data in the format expected by the backend
+      const salesOrderData = {
+        customerId: values.customerId,
+        paymentInfo: {
+          paymentType: values.paymentInfo.paymentType,
+          dueDate: values.paymentInfo.dueDate.toISOString(),
+        },
+        items: values.items.map((item: any) => ({
+          productId: item.productId,
+          quantity: parseInt(item.quantity),
+          packageSize: item.packageSize,
+        })),
+      };
+
+      await createSalesOrder(salesOrderData);
       navigate("/admin/salesOrders");
     } catch (error: any) {
       console.error("Error creating sales order:", error);
@@ -137,7 +154,10 @@ const NewSalesOrder = () => {
           <Formik
             initialValues={{
               customerId: "",
-              paymentDueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from now
+              paymentInfo: {
+                paymentType: "one-time",
+                dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from now
+              },
               items: [
                 {
                   productId: "",
@@ -178,18 +198,58 @@ const NewSalesOrder = () => {
                   </div>
 
                   <div>
-                    <Label htmlFor="paymentDueDate">Payment Due Date</Label>
+                    <Label htmlFor="paymentInfo.paymentType">
+                      Payment Type
+                    </Label>
+                    <Select
+                      value={values.paymentInfo.paymentType}
+                      onValueChange={(value) => {
+                        setFieldValue("paymentInfo.paymentType", value);
+                      }}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select Payment Type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="one-time">
+                          One Time Payment
+                        </SelectItem>
+                        <SelectItem value="two-time">
+                          Two Time Payments
+                        </SelectItem>
+                        <SelectItem value="date-based">
+                          Date Based Payments
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                    {errors.paymentInfo?.paymentType &&
+                      touched.paymentInfo?.paymentType && (
+                        <div className="text-red-500 text-sm">
+                          {errors.paymentInfo.paymentType as string}
+                        </div>
+                      )}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="paymentInfo.dueDate">
+                      Payment Due Date
+                    </Label>
                     <DatePicker
-                      selected={values.paymentDueDate}
-                      onChange={(date) => setFieldValue("paymentDueDate", date)}
+                      selected={values.paymentInfo.dueDate}
+                      onChange={(date) =>
+                        setFieldValue("paymentInfo.dueDate", date)
+                      }
                       minDate={new Date()}
                       className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                     />
-                    {errors.paymentDueDate && touched.paymentDueDate && (
-                      <div className="text-red-500 text-sm">
-                        {errors.paymentDueDate as string}
-                      </div>
-                    )}
+                    {errors.paymentInfo?.dueDate &&
+                      touched.paymentInfo?.dueDate && (
+                        <div className="text-red-500 text-sm">
+                          {errors.paymentInfo.dueDate as string}
+                        </div>
+                      )}
                   </div>
                 </div>
 

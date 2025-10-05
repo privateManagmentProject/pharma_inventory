@@ -12,9 +12,20 @@ export interface SalesOrderItem {
   supplierId: string | { _id: string; name: string };
   supplierName: string;
 }
+
 export interface PaymentInfo {
+  paymentType: "one-time" | "two-time" | "date-based";
   dueDate: string;
+  secondPaymentDate?: string; // For two-time payments
+  paymentSchedule?: Array<{
+    // For date-based payments
+    date: string;
+    amount: number;
+    status: "pending" | "paid" | "overdue";
+  }>;
   status: "pending" | "partial" | "completed" | "overdue";
+  totalPaidAmount: number;
+  remainingAmount: number;
 }
 
 export interface SalesOrder {
@@ -28,14 +39,25 @@ export interface SalesOrder {
   status: "pending" | "progress" | "approved" | "rejected" | "completed";
   customerName: string;
   createdAt: string;
+  updatedAt: string;
+  notes?: string;
 }
 
 export interface SalesOrderFormData {
   customerId: string;
+  paymentInfo: {
+    paymentType: string;
+    dueDate: string;
+    secondPaymentDate?: string;
+    paymentSchedule?: Array<{
+      date: string;
+      amount: number;
+    }>;
+  };
   items: {
     productId: string;
-    quantity: string;
+    quantity: number;
     packageSize: string;
   }[];
-  paymentDueDate: string;
+  notes?: string;
 }
