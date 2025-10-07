@@ -64,6 +64,7 @@ api.interceptors.request.use(
     const token = localStorage.getItem("pos-token");
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
+      config.headers.withCredentials = true;
     }
     return config;
   },
