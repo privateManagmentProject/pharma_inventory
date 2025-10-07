@@ -16,7 +16,7 @@ dotenv.config();
 const app = express();
 app.use(cors({
   origin: [
-    "https://pharma-inventory-6.onrender.com",
+    "https://pharma-inventory-6.onrender.com/$1",
  
   ],
   methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
