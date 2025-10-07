@@ -4,36 +4,27 @@ import express from 'express';
 import connectDB from './db/connection.js';
 import authRoutes from './routes/auth.js';
 import categoryRoutes from './routes/category.js';
-import customerRoutes from "./routes/customer.js";
-import dashboardRoutes from "./routes/dashboard.js";
-import excelRoutes from "./routes/excel.js";
-import notificationRoutes from "./routes/notification.js";
-import productRoutes from "./routes/product.js";
-import SalesOrderRoutes from "./routes/salesOrder.js";
-import supplierRoutes from "./routes/supplier.js";
+import customerRoutes from './routes/customer.js';
+import dashboardRoutes from './routes/dashboard.js';
+import excelRoutes from './routes/excel.js';
+import notificationRoutes from './routes/notification.js';
+import productRoutes from './routes/product.js';
+import SalesOrderRoutes from './routes/salesOrder.js';
+import supplierRoutes from './routes/supplier.js';
+
 dotenv.config();
 
 const app = express();
+
 app.use(cors({
-  origin: [
-    "https://pharma-inventory-6.onrender.com/$1",
- 
-  ],
+  origin: "https://pharma-inventory-6.onrender.com", // Remove trailing slash
   methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-  allowedHeaders: [
-    "Content-Type", 
-    "Authorization", 
-    "X-Requested-With",
-    "Accept",
-    "Origin"
-  ],
+  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept", "Origin"],
   credentials: true,
   preflightContinue: false,
   optionsSuccessStatus: 204
 }));
 
-// Handle preflight requests explicitly
-app.options('*', cors());
 app.use(express.json());
 app.use('/uploads', express.static('uploads'));
 
@@ -49,6 +40,6 @@ app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/excel', excelRoutes);
 
 app.listen(process.env.PORT || 5000, () => {
-    connectDB();
-    console.log(`Server is running on port ${process.env.PORT || 5000}`);
+  connectDB();
+  console.log(`Server is running on port ${process.env.PORT || 5000}`);
 });
