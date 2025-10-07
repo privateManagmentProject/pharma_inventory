@@ -67,7 +67,7 @@ const DetailCustomer: React.FC<DetailCustomerProps> = ({
               {customer.licenses.map((license, index) => (
                 <a
                   key={index}
-                  href={`http://localhost:5000/${license.path}`} // Adjust URL as needed
+                  href={`https://pharma-inventory-3.onrender.com//${license.path}`} // Adjust URL as needed
                   target="_blank"
                   rel="noopener noreferrer"
                   className="block text-blue-600 hover:underline"

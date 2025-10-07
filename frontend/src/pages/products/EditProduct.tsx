@@ -337,7 +337,7 @@ const EditProduct = () => {
                     {product.image && !imageFile && (
                       <div className="mt-2">
                         <img
-                          src={`http://localhost:5000/${product.image}`}
+                          src={`https://pharma-inventory-3.onrender.com//${product.image}`}
                           alt={product.name}
                           className="h-20 w-20 object-cover rounded"
                         />

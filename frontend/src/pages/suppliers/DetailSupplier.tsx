@@ -106,7 +106,7 @@ const DetailSupplier: React.FC<DetailSupplierProps> = ({
                     {supplier.licenses.map((license, index) => (
                       <li key={index}>
                         <a
-                          href={`http://localhost:5000/${license.path}`}
+                          href={`https://pharma-inventory-3.onrender.com//${license.path}`}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="flex items-center text-blue-600 dark:text-blue-400 hover:underline transition-colors"

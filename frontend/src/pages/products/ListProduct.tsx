@@ -180,7 +180,7 @@ const ListProduct = () => {
       accessorKey: "image",
       cell: ({ row }) => (
         <img
-          src={`http://localhost:5000/${row.original.image}`}
+          src={`https://pharma-inventory-3.onrender.com//${row.original.image}`}
           alt={row.original.name}
           className="h-10 w-10 object-cover rounded"
         />

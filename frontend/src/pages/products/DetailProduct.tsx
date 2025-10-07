@@ -3,10 +3,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 
+import { Badge } from "@/components/ui/badge";
 import { ArrowLeft } from "lucide-react";
 import { GetProductByID } from "./api/productAPI";
 import type { Product } from "./constants/product";
-import { Badge } from "@/components/ui/badge";
 
 const DetailProduct = () => {
   const { id } = useParams<{ id: string }>();
@@ -111,7 +111,7 @@ const DetailProduct = () => {
               <div>
                 <h3 className="font-semibold">Product Image</h3>
                 <img
-                  src={`http://localhost:5000/${product.image}`}
+                  src={`https://pharma-inventory-3.onrender.com//${product.image}`}
                   alt={product.name}
                   className="h-40 w-40 object-cover rounded mt-2"
                 />
