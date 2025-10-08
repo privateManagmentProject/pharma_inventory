@@ -1,61 +1,11 @@
-// import { API_BASE_URL } from "../constants";
-
-// class ApiClient {
-//   private baseUrl: string;
-
-//   constructor() {
-//     this.baseUrl = API_BASE_URL;
-//   }
-
-//   async request(endpoint: string, options: RequestInit = {}) {
-//     const url = `${this.baseUrl}${endpoint}`;
-//     const response = await fetch(url, {
-//       headers: {
-//         "Content-Type": "application/json",
-//         ...options.headers,
-//       },
-//       ...options,
-//     });
-
-//     if (!response.ok) {
-//       throw new Error(`HTTP error! status: ${response.status}`);
-//     }
-
-//     return response.json();
-//   }
-
-//   //   get(endpoint: string) {
-//   //     return this.request(endpoint);
-//   //   }
-
-//   //   post(endpoint: string, data: any) {
-//   //     return this.request(endpoint, {
-//   //       method: "POST",
-//   //       body: JSON.stringify(data),
-//   //     });
-//   //   }
-
-//   //   put(endpoint: string, data: any) {
-//   //     return this.request(endpoint, {
-//   //       method: "PUT",
-//   //       body: JSON.stringify(data),
-//   //     });
-//   //   }
-
-//   //   delete(endpoint: string) {
-//   //     return this.request(endpoint, {
-//   //       method: "DELETE",
-//   //     });
-//   //   }
-// }
-
-// export const apiClient = new ApiClient();
-
 import axios from "axios";
-import { API_BASE_URL } from "../constants";
+
+export const API_BASE_URL = import.meta.env.VITE_API_URL;
 
 const api = axios.create({
   baseURL: API_BASE_URL,
+  withCredentials: false,
+  timeout: 10000,
 });
 
 // Add a request interceptor to include the auth token
@@ -64,8 +14,13 @@ api.interceptors.request.use(
     const token = localStorage.getItem("pos-token");
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
-      config.headers.withCredentials = true;
     }
+
+    // Ensure Content-Type is set for all requests
+    if (!config.headers["Content-Type"]) {
+      config.headers["Content-Type"] = "application/json";
+    }
+
     return config;
   },
   (error) => {
@@ -82,6 +37,12 @@ api.interceptors.response.use(
       localStorage.removeItem("pos-user");
       window.location.href = "/login";
     }
+
+    // Handle CORS errors
+    if (error.code === "ERR_NETWORK" || error.message.includes("CORS")) {
+      console.error("CORS Error:", error);
+    }
+
     return Promise.reject(error);
   }
 );

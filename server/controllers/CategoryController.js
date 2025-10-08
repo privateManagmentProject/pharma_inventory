@@ -5,7 +5,7 @@ const createCategory = async (req, res) => {
       
         const existigCategory= await CategoryModel.findOne({ categoryName});
         if(existigCategory){
-            return res.statu(400).json({ success: false, message: "Category already exists"});
+            return res.status(400).json({ success: false, message: "Category already exists"});
 
         }
        const newCategroy = new CategoryModel({categoryName,categoryDescription,
@@ -40,7 +40,7 @@ const UpdateCategories =async (req, res) =>{
          const existigCategory= await CategoryModel.findById(id);
           
         if(!existigCategory){
-            return res.statu(400).json({ success: false, message: "Category not found"});
+            return res.status(400).json({ success: false, message: "Category not found"});
 
         }
         const updatedCategory = await CategoryModel.findByIdAndUpdate(

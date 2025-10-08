@@ -13,18 +13,9 @@ import SalesOrderRoutes from './routes/salesOrder.js';
 import supplierRoutes from './routes/supplier.js';
 
 dotenv.config();
-
 const app = express();
 
-app.use(cors({
-  origin: "https://pharma-inventory-6.onrender.com", // Remove trailing slash
-  methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept", "Origin"],
-  credentials: true,
-  preflightContinue: false,
-  optionsSuccessStatus: 204
-}));
-
+app.use(cors());
 app.use(express.json());
 app.use('/uploads', express.static('uploads'));
 
