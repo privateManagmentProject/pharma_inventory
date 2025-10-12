@@ -1,6 +1,8 @@
 import cors from 'cors';
 import dotenv from 'dotenv';
 import express from 'express';
+import fs from 'fs';
+import path from 'path';
 import connectDB from './db/connection.js';
 import authRoutes from './routes/auth.js';
 import categoryRoutes from './routes/category.js';
@@ -11,12 +13,32 @@ import notificationRoutes from './routes/notification.js';
 import productRoutes from './routes/product.js';
 import SalesOrderRoutes from './routes/salesOrder.js';
 import supplierRoutes from './routes/supplier.js';
-
 dotenv.config();
 const app = express();
 
 app.use(cors());
 app.use(express.json());
+
+
+app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
+
+// Create uploads directory if it doesn't exist
+const uploadsDir = path.join(process.cwd(), 'uploads');
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+}
+
+// Add this route to handle image serving
+app.get('/api/product/image/:filename', (req, res) => {
+  const { filename } = req.params;
+  const imagePath = path.join(uploadsDir, filename);
+  
+  if (fs.existsSync(imagePath)) {
+    res.sendFile(imagePath);
+  } else {
+    res.status(404).json({ success: false, message: "Image not found" });
+  }
+});
 app.use('/uploads', express.static('uploads'));
 
 // Routes

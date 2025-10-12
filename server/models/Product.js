@@ -1,35 +1,50 @@
 import mongoose from "mongoose";
 
-const ProduceSchema = new mongoose.Schema({ 
-    name: { type: String, require: true },
+const ProductSchema = new mongoose.Schema({ 
+    name: { type: String, required: true },
     brandName: { type: String },
+    brandRate: { 
+        type: String, 
+        enum: ['good', 'very good', 'excellent'],
+        default: 'good'
+    },
     description: { type: String, required: true },
     manufacturer: { type: String},
-    price: { type: String, required: true },
-    supplierPrice: { type: String, required: true },
+    soldPrice: { type: String, required: true }, // Changed from price
+    purchasePrice: { type: String, required: true }, // Changed from supplierPrice
     expiryDate: { type: Date, required: true},
     stock: { type: String, required: true },
-    lowStockThreshold: { type: Number, default: 10 }, // Alert when stock goes below this
+    lowStockThreshold: { type: Number, default: 500 }, // Changed to 500
+    outOfStockThreshold: { type: Number, default: 100 }, // Added out of stock threshold
     image: { type: String },
     packageSize: { 
         type: String, 
         required: true,
-        enum: ['kg', 'box', 'bottle', 'pack', 'unit']
+        enum: ['carton', 'box', 'bottle', 'pack', 'strip'] // Removed 'unit', added 'carton', 'strip'
     },
-    categoryId: {type: mongoose.Schema.Types.ObjectId, ref: "Category", require: true},
-    supplierId: {type: mongoose.Schema.Types.ObjectId, ref: "Supplier", require: true},
-    userId: {type: mongoose.Schema.Types.ObjectId, ref: "User", require: true}, // Track which user added this product
+    cartonSize: { type: String }, // New field for carton size
+    categoryId: {type: mongoose.Schema.Types.ObjectId, ref: "Category", required: true},
+    supplierId: {type: mongoose.Schema.Types.ObjectId, ref: "Supplier", required: true},
+    userId: {type: mongoose.Schema.Types.ObjectId, ref: "User", required: true},
     isActive: { type: Boolean, default: true },
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now }
 });
 
 // Update the updatedAt field before saving
-ProduceSchema.pre('save', function(next) {
+ProductSchema.pre('save', function(next) {
     this.updatedAt = new Date();
     next();
 });
 
-const ProductModal = mongoose.model("Product", ProduceSchema);
+// Virtual for stock status
+ProductSchema.virtual('stockStatus').get(function() {
+    const stock = parseInt(this.stock);
+    if (stock <= this.outOfStockThreshold) return 'out';
+    if (stock <= this.lowStockThreshold) return 'low';
+    return 'available';
+});
 
-export default ProductModal;
+const ProductModel = mongoose.model("Product", ProductSchema);
+
+export default ProductModel;
