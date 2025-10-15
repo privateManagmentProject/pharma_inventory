@@ -33,7 +33,7 @@ const createSupplier = async (req, res) => {
       const { name, email, phone, address, description, tinNumber, accounts } = req.body;
       
       const existingSupplier = await SupplierModal.findOne({ 
-        $or: [{ email }, { tinNumber }] 
+        $or: [ { tinNumber }] 
       });
       
       if (existingSupplier) {
