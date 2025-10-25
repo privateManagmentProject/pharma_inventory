@@ -47,6 +47,15 @@ export const updateSalesOrderStatus = async (id: string, status: string) => {
   }
 };
 
+export const generateSalesOrderPDF = async (id: string, type: string) => {
+  try {
+    const response = await api.get(`/sales-order/${id}/pdf?type=${type}`);
+    return response.data;
+  } catch (error) {
+    return Promise.reject(error);
+  }
+};
+
 export const deleteSalesOrder = async (id: string) => {
   try {
     const response = await api.delete(`/sales-order/${id}`);

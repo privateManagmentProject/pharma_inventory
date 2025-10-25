@@ -24,6 +24,36 @@ import { getSuppliers } from "../suppliers/api/supplierAPI";
 import type { Supplier } from "../suppliers/constants/supplier";
 import { createSalesOrder } from "./api/ salesOrderAPI";
 
+// const validationSchema = Yup.object({
+//   customerId: Yup.string().required("Customer is required"),
+//   paymentInfo: Yup.object({
+//     paymentType: Yup.string().required("Payment type is required"),
+//     dueDate: Yup.date().required("Payment due date is required"),
+//   }),
+//   items: Yup.array()
+//     .of(
+//       Yup.object().shape({
+//         productId: Yup.string().required("Product is required"),
+//         quantity: Yup.number()
+//           .required("Quantity is required")
+//           .positive("Quantity must be positive")
+//           .integer("Quantity must be a whole number")
+//           .test(
+//             "stock-check",
+//             "Quantity exceeds available stock",
+//             function (value) {
+//               const productId = this.parent.productId;
+//               const product = this.options.context?.products.find(
+//                 (p: Product) => p._id === productId
+//               );
+//               return product ? value <= parseInt(product.stock) : true;
+//             }
+//           ),
+//         packageSize: Yup.string().required("Package size is required"),
+//       })
+//     )
+//     .min(1, "At least one item is required"),
+// });
 const validationSchema = Yup.object({
   customerId: Yup.string().required("Customer is required"),
   paymentInfo: Yup.object({
@@ -51,6 +81,9 @@ const NewSalesOrder = () => {
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
   const [productSearchTerm, setProductSearchTerm] = useState("");
+  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(
+    null
+  );
 
   useEffect(() => {
     fetchProducts();
@@ -136,6 +169,11 @@ const NewSalesOrder = () => {
     return supplier ? [supplier] : [];
   };
 
+  const handleCustomerChange = (customerId: string) => {
+    const customer = customers.find((c) => c._id === customerId);
+    setSelectedCustomer(customer || null);
+  };
+
   return (
     <div className="container mx-auto p-6">
       <div className="mb-6">
@@ -177,6 +215,7 @@ const NewSalesOrder = () => {
                     <Select
                       onValueChange={(value) => {
                         setFieldValue("customerId", value);
+                        handleCustomerChange(value);
                       }}
                     >
                       <SelectTrigger>
@@ -230,6 +269,41 @@ const NewSalesOrder = () => {
                       )}
                   </div>
                 </div>
+
+                {/* Customer Information Display */}
+                {selectedCustomer && (
+                  <Card className="bg-muted/50">
+                    <CardContent className="p-4">
+                      <h4 className="font-semibold mb-2">
+                        Customer Information
+                      </h4>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                        <div>
+                          <Label className="text-xs">Name</Label>
+                          <p>{selectedCustomer.name}</p>
+                        </div>
+                        {selectedCustomer.tinNumber && (
+                          <div>
+                            <Label className="text-xs">TIN Number</Label>
+                            <p>{selectedCustomer.tinNumber}</p>
+                          </div>
+                        )}
+                        {selectedCustomer.address && (
+                          <div>
+                            <Label className="text-xs">Address</Label>
+                            <p>{selectedCustomer.address}</p>
+                          </div>
+                        )}
+                        {selectedCustomer.licenseNumber && (
+                          <div>
+                            <Label className="text-xs">License Number</Label>
+                            <p>{selectedCustomer.licenseNumber}</p>
+                          </div>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
@@ -315,7 +389,7 @@ const NewSalesOrder = () => {
                                 )}
                               </div>
 
-                              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                                 <div>
                                   <Label htmlFor={`items.${index}.productId`}>
                                     Product
@@ -374,6 +448,7 @@ const NewSalesOrder = () => {
                                     name={`items.${index}.quantity`}
                                     type="number"
                                     placeholder="Enter quantity"
+                                    min="1"
                                   />
                                   {errors.items?.[index]?.quantity &&
                                     touched.items?.[index]?.quantity && (
@@ -431,14 +506,18 @@ const NewSalesOrder = () => {
 
                                 {productSuppliers.length > 0 && (
                                   <div>
-                                    <Label>Supplier</Label>
+                                    <Label>Supplier & Pricing</Label>
                                     <div className="p-2 bg-muted rounded-md">
-                                      {productSuppliers[0].name}
+                                      <p className="font-medium">
+                                        {productSuppliers[0].name}
+                                      </p>
+                                      {selectedProduct && (
+                                        <p className="text-sm">
+                                          Selling Price: $
+                                          {selectedProduct.price}
+                                        </p>
+                                      )}
                                     </div>
-                                    <p className="text-sm text-muted-foreground mt-1">
-                                      This product is supplied by{" "}
-                                      {productSuppliers[0].name}
-                                    </p>
                                   </div>
                                 )}
                               </div>

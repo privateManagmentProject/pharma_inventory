@@ -2,99 +2,6 @@ import CustomerModal from "../models/Customer.js";
 import ProductModal from "../models/Product.js";
 import SalesOrderModal from "../models/SalesOrder.js";
 
-const createSalesOrder = async (req, res) => {
-  try {
-    const { 
-      customerId, 
-      items, 
-      paymentInfo,
-      notes 
-    } = req.body;
-
-    // Validate customer
-    const customer = await CustomerModal.findById(customerId);
-    if (!customer) {
-      return res.status(404).json({ success: false, message: "Customer not found" });
-    }
-
-    // Validate items and calculate total
-    let totalAmount = 0;
-    const orderItems = [];
-    
-    for (const item of items) {
-      const product = await ProductModal.findById(item.productId)
-        .populate('categoryId')
-        .populate('supplierId');
-      
-      if (!product) {
-        return res.status(404).json({ success: false, message: `Product ${item.productId} not found` });
-      }
-      
-      if (parseInt(product.stock) < parseInt(item.quantity)) {
-        return res.status(400).json({ 
-          success: false, 
-          message: `Insufficient stock for ${product.name}. Available: ${product.stock}, Requested: ${item.quantity}` 
-        });
-      }
-      
-      const itemTotal = parseFloat(product.price) * parseInt(item.quantity);
-      totalAmount += itemTotal;
-      
-      orderItems.push({
-        productId: item.productId,
-        productName: product.name,
-        productCategory: product.categoryId?.name || '',
-        quantity: item.quantity,
-        packageSize: item.packageSize,
-        unitPrice: product.price,
-        totalPrice: itemTotal.toFixed(2),
-        supplierId: product.supplierId?._id || '',
-        supplierName: product.supplierId?.name || ''
-      });
-    }
-
-    // Process payment info based on payment type
-    let processedPaymentInfo = {
-      paymentType: paymentInfo.paymentType || 'one-time',
-      dueDate: paymentInfo.dueDate,
-      status: 'pending',
-      totalPaidAmount: 0,
-      remainingAmount: totalAmount
-    };
-
-    if (paymentInfo.paymentType === 'two-time') {
-      processedPaymentInfo.secondPaymentDate = paymentInfo.secondPaymentDate;
-    } else if (paymentInfo.paymentType === 'date-based') {
-      processedPaymentInfo.paymentSchedule = paymentInfo.paymentSchedule || [];
-    }
-
-    // Create sales order
-    const newSalesOrder = new SalesOrderModal({
-      customerId,
-      customerName: customer.name,
-      items: orderItems,
-      totalAmount: totalAmount.toFixed(2),
-      paymentInfo: processedPaymentInfo,
-      status: 'pending',
-      paidAmount: 0,
-      unpaidAmount: totalAmount,
-      notes: notes || ''
-    });
-
-    await newSalesOrder.save();
-    
-    return res.status(201).json({ 
-      success: true, 
-      message: "Sales order created successfully", 
-      salesOrder: newSalesOrder 
-    });
-
-  } catch (error) {
-    console.error("Error creating sales order:", error);
-    return res.status(500).json({ success: false, message: "Server error" });
-  }
-};
-
 const getSalesOrders = async (req, res) => {
     try {
         const { 
@@ -107,6 +14,7 @@ const getSalesOrders = async (req, res) => {
             dateTo,
             minAmount,
             maxAmount,
+            search, // General search term
             sortBy = 'createdAt',
             sortOrder = 'desc',
             page = 1,
@@ -115,7 +23,18 @@ const getSalesOrders = async (req, res) => {
         
         let filter = {};
         
-        // Status filters
+        // General search across multiple fields
+        if (search) {
+            const searchRegex = { $regex: search, $options: 'i' };
+            filter.$or = [
+                { customerName: searchRegex },
+                { 'items.productName': searchRegex },
+                { 'items.supplierName': searchRegex },
+                { customerTin: searchRegex }
+            ];
+        }
+        
+        // Specific field filters
         if (status) filter.status = status;
         if (customerName) filter.customerName = { $regex: customerName, $options: 'i' };
         if (productName) {
@@ -186,7 +105,7 @@ const addPayment = async (req, res) => {
         }
 
         const paymentAmount = parseFloat(amount);
-        const totalAmount = parseFloat(salesOrder.totalAmount);
+        const totalAmount = salesOrder.totalAmount;
         const currentPaidAmount = salesOrder.paidAmount || 0;
         const newPaidAmount = currentPaidAmount + paymentAmount;
 
@@ -225,7 +144,7 @@ const addPayment = async (req, res) => {
             salesOrder.status = 'completed';
         } else if (newPaidAmount > 0) {
             salesOrder.paymentInfo.status = 'partial';
-            salesOrder.status = 'progress';
+            salesOrder.status = 'payment_progress';
         }
 
         // Check if overdue
@@ -267,7 +186,7 @@ const getPaymentSchedule = async (req, res) => {
         }
 
         const paymentSchedule = salesOrder.paymentInfo?.paymentSchedule || [];
-        const totalAmount = parseFloat(salesOrder.totalAmount);
+        const totalAmount = salesOrder.totalAmount;
         const paidAmount = salesOrder.paidAmount || 0;
 
         return res.status(200).json({
@@ -304,19 +223,19 @@ const updateSalesOrder = async (req, res) => {
             salesOrder.paidAmount += additionalAmount;
             
             // Auto-update status based on payment
-            const totalAmount = parseFloat(salesOrder.totalAmount);
+            const totalAmount = salesOrder.totalAmount;
             if (salesOrder.paidAmount >= totalAmount) {
                 salesOrder.status = 'completed';
                 if (salesOrder.paymentInfo) {
                     salesOrder.paymentInfo.status = 'completed';
                 }
             } else if (salesOrder.paidAmount > 0) {
-                salesOrder.status = 'progress';
+                salesOrder.status = 'payment_progress';
                 if (salesOrder.paymentInfo) {
                     salesOrder.paymentInfo.status = 'partial';
                 }
             } else {
-                salesOrder.status = 'pending';
+                salesOrder.status = 'order_created';
                 if (salesOrder.paymentInfo) {
                     salesOrder.paymentInfo.status = 'pending';
                 }
@@ -336,9 +255,9 @@ const updateSalesOrder = async (req, res) => {
         if (status) {
             salesOrder.status = status;
             
-            // If manually approved, set paid amount to full price
-            if (status === 'approved' || status === 'completed') {
-                salesOrder.paidAmount = parseFloat(salesOrder.totalAmount);
+            // If manually completed, set paid amount to full price
+            if (status === 'completed') {
+                salesOrder.paidAmount = salesOrder.totalAmount;
                 if (salesOrder.paymentInfo) {
                     salesOrder.paymentInfo.status = 'completed';
                 }
@@ -355,23 +274,23 @@ const updateSalesOrder = async (req, res) => {
         await salesOrder.save();
 
         // Handle stock changes for multiple items
-        if ((salesOrder.status === 'approved' || salesOrder.status === 'completed') && 
-            (oldStatus !== 'approved' && oldStatus !== 'completed')) {
-            // Reduce stock for all items when order is approved/completed
+        if ((salesOrder.status === 'completed') && 
+            (oldStatus !== 'completed')) {
+            // Reduce stock for all items when order is completed
             for (const item of salesOrder.items) {
                 const product = await ProductModal.findById(item.productId);
                 if (product) {
-                    product.stock = (parseInt(product.stock) - parseInt(item.quantity)).toString();
+                    product.stock = product.stock - item.quantity;
                     await product.save();
                 }
             }
-        } else if ((oldStatus === 'approved' || oldStatus === 'completed') && 
-                   (salesOrder.status !== 'approved' && salesOrder.status !== 'completed')) {
-            // Restock all items if order is no longer approved/completed
+        } else if ((oldStatus === 'completed') && 
+                   (salesOrder.status !== 'completed')) {
+            // Restock all items if order is no longer completed
             for (const item of salesOrder.items) {
                 const product = await ProductModal.findById(item.productId);
                 if (product) {
-                    product.stock = (parseInt(product.stock) + parseInt(item.quantity)).toString();
+                    product.stock = product.stock + item.quantity;
                     await product.save();
                 }
             }
@@ -385,70 +304,6 @@ const updateSalesOrder = async (req, res) => {
 
     } catch (error) {
         console.error("Update sales order error:", error);
-        return res.status(500).json({ success: false, message: "Server error" });
-    }
-};
-
-const updateSalesOrderStatus = async (req, res) => {
-    try {
-        const { id } = req.params;
-        const { status } = req.body;
-
-        const salesOrder = await SalesOrderModal.findById(id);
-        if (!salesOrder) {
-            return res.status(404).json({ success: false, message: "Sales order not found" });
-        }
-
-        const oldStatus = salesOrder.status;
-        salesOrder.status = status;
-
-        // If approving the order, reduce the product stock
-        if ((status === 'approved' || status === 'completed') && 
-            (oldStatus !== 'approved' && oldStatus !== 'completed')) {
-            for (const item of salesOrder.items) {
-                const product = await ProductModal.findById(item.productId);
-                if (!product) {
-                    return res.status(404).json({ success: false, message: "Product not found" });
-                }
-
-                // Update stock
-                product.stock = (parseInt(product.stock) - parseInt(item.quantity)).toString();
-                await product.save();
-            }
-            
-            // Set paid amount to full price if approving
-            salesOrder.paidAmount = parseFloat(salesOrder.totalAmount);
-            if (salesOrder.paymentInfo) {
-                salesOrder.paymentInfo.status = 'completed';
-            }
-        }
-
-        // If rejecting an approved order, restock the product
-        if ((status === 'rejected' || status === 'pending') && 
-            (oldStatus === 'approved' || oldStatus === 'completed')) {
-            for (const item of salesOrder.items) {
-                const product = await ProductModal.findById(item.productId);
-                if (product) {
-                    product.stock = (parseInt(product.stock) + parseInt(item.quantity)).toString();
-                    await product.save();
-                }
-            }
-            
-            // Reset paid amount if rejecting
-            salesOrder.paidAmount = 0;
-            if (salesOrder.paymentInfo) {
-                salesOrder.paymentInfo.status = 'pending';
-            }
-        }
-
-        await salesOrder.save();
-
-        return res.status(200).json({ 
-            success: true, 
-            message: "Sales order status updated successfully" 
-        });
-
-    } catch (error) {
         return res.status(500).json({ success: false, message: "Server error" });
     }
 };
@@ -471,28 +326,200 @@ const getSalesOrderById = async (req, res) => {
       return res.status(404).json({ success: false, message: "Sales order not found" });
     }
     
-    // Format the response to include names
-    const formattedSalesOrder = {
-      ...salesOrder.toObject(),
-      customerName: salesOrder.customerId?.name || salesOrder.customerName,
-      items: salesOrder.items.map(item => ({
-        ...item,
-        productName: item.productId?.name || item.productName,
-        productCategory: item.productId?.categoryId?.name || item.productCategory,
-        supplierName: item.supplierId?.name || item.supplierName
-      }))
-    };
-    
-    return res.status(200).json({ success: true, salesOrder: formattedSalesOrder });
+    return res.status(200).json({ success: true, salesOrder });
   } catch (error) {
     console.error("Error fetching sales order:", error);
     return res.status(500).json({ success: false, message: "Server error" });
   }
 };
 
+const createSalesOrder = async (req, res) => {
+  try {
+    const { 
+      customerId, 
+      items, 
+      paymentInfo,
+      notes 
+    } = req.body;
+
+    // Validate customer and get additional info
+    const customer = await CustomerModal.findById(customerId);
+    if (!customer) {
+      return res.status(404).json({ success: false, message: "Customer not found" });
+    }
+
+    // Validate items and calculate total
+    let totalAmount = 0;
+    const orderItems = [];
+    
+    for (const item of items) {
+      const product = await ProductModal.findById(item.productId)
+        .populate('categoryId')
+        .populate('supplierId');
+      
+      if (!product) {
+        return res.status(404).json({ success: false, message: `Product ${item.productId} not found` });
+      }
+      
+      if (product.stock < parseInt(item.quantity)) {
+        return res.status(400).json({ 
+          success: false, 
+          message: `Insufficient stock for ${product.name}. Available: ${product.stock}, Requested: ${item.quantity}` 
+        });
+      }
+      
+      // Use soldPrice for unitPrice and purchasePrice for supplierPrice
+      const unitPrice = product.soldPrice;
+      const supplierPrice = product.purchasePrice;
+      const itemTotal = unitPrice * parseInt(item.quantity);
+      totalAmount += itemTotal;
+      
+      orderItems.push({
+        productId: item.productId,
+        productName: product.name,
+        productCategory: product.categoryId?.name || '',
+        quantity: parseInt(item.quantity),
+        packageSize: item.packageSize,
+        unitPrice: unitPrice,
+        supplierPrice: supplierPrice,
+        totalPrice: itemTotal,
+        supplierId: product.supplierId?._id || '',
+        supplierName: product.supplierId?.name || ''
+      });
+    }
+
+    // Process payment info
+    let processedPaymentInfo = {
+      paymentType: paymentInfo.paymentType || 'one-time',
+      dueDate: paymentInfo.dueDate,
+      status: 'pending',
+      totalPaidAmount: 0,
+      remainingAmount: totalAmount
+    };
+
+    if (paymentInfo.paymentType === 'two-time') {
+      processedPaymentInfo.secondPaymentDate = paymentInfo.secondPaymentDate;
+    } else if (paymentInfo.paymentType === 'date-based') {
+      processedPaymentInfo.paymentSchedule = paymentInfo.paymentSchedule || [];
+    }
+
+    // Create sales order with customer details
+    const newSalesOrder = new SalesOrderModal({
+      customerId,
+      customerName: customer.name,
+      customerTin: customer.tinNumber,
+      customerAddress: customer.address,
+      customerLicense: customer.licenseNumber,
+      items: orderItems,
+      totalAmount: totalAmount,
+      paymentInfo: processedPaymentInfo,
+      status: 'order_created',
+      paidAmount: 0,
+      unpaidAmount: totalAmount,
+      notes: notes || ''
+    });
+
+    await newSalesOrder.save();
+    
+    return res.status(201).json({ 
+      success: true, 
+      message: "Sales order created successfully", 
+      salesOrder: newSalesOrder 
+    });
+
+  } catch (error) {
+    console.error("Error creating sales order:", error);
+    return res.status(500).json({ success: false, message: "Server error" });
+  }
+};
+
+const generateSalesOrderPDF = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { type } = req.query; // 'customer', 'supplier', 'internal'
+
+    const salesOrder = await SalesOrderModal.findById(id)
+      .populate('customerId')
+      .populate({
+        path: 'items.productId',
+        populate: {
+          path: 'categoryId',
+          model: 'Category'
+        }
+      })
+      .populate('items.supplierId');
+
+    if (!salesOrder) {
+      return res.status(404).json({ success: false, message: "Sales order not found" });
+    }
+
+    // Return data for PDF generation
+    return res.status(200).json({
+      success: true,
+      salesOrder,
+      pdfType: type
+    });
+
+  } catch (error) {
+    console.error("Error generating PDF:", error);
+    return res.status(500).json({ success: false, message: "Server error" });
+  }
+};
+
+const updateSalesOrderStatus = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+
+    const salesOrder = await SalesOrderModal.findById(id);
+    if (!salesOrder) {
+      return res.status(404).json({ success: false, message: "Sales order not found" });
+    }
+
+    const oldStatus = salesOrder.status;
+    salesOrder.status = status;
+
+    // Handle stock changes only when order progresses to completed
+    if (status === 'completed' && oldStatus !== 'completed') {
+      for (const item of salesOrder.items) {
+        const product = await ProductModal.findById(item.productId);
+        if (!product) {
+          return res.status(404).json({ success: false, message: "Product not found" });
+        }
+
+        // Update stock
+        product.stock = product.stock - item.quantity;
+        await product.save();
+      }
+    }
+
+    // If moving back from completed, restock
+    if (oldStatus === 'completed' && status !== 'completed') {
+      for (const item of salesOrder.items) {
+        const product = await ProductModal.findById(item.productId);
+        if (product) {
+          product.stock = product.stock + item.quantity;
+          await product.save();
+        }
+      }
+    }
+
+    await salesOrder.save();
+
+    return res.status(200).json({ 
+      success: true, 
+      message: "Sales order status updated successfully" 
+    });
+
+  } catch (error) {
+    return res.status(500).json({ success: false, message: "Server error" });
+  }
+};
+
 export {
-    addPayment, createSalesOrder, getPaymentSchedule, getSalesOrderById,
+    addPayment, createSalesOrder, generateSalesOrderPDF, getPaymentSchedule, getSalesOrderById,
     getSalesOrders,
     updateSalesOrder,
     updateSalesOrderStatus
 };
+

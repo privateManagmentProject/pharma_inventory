@@ -2,6 +2,7 @@ import express from "express";
 import {
     addPayment,
     createSalesOrder,
+    generateSalesOrderPDF,
     getPaymentSchedule,
     getSalesOrderById,
     getSalesOrders,
@@ -12,17 +13,14 @@ import authMiddleware from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
-// All routes require authentication
 router.use(authMiddleware);
 
-// Sales order CRUD operations
 router.post("/add", createSalesOrder);
 router.get("/", getSalesOrders);
 router.get("/:id", getSalesOrderById);
+router.get("/:id/pdf", generateSalesOrderPDF); // New PDF route
 router.put("/:id", updateSalesOrder);
 router.put("/:id/status", updateSalesOrderStatus);
-
-// Payment operations
 router.post("/:id/payment", addPayment);
 router.get("/:id/payment-schedule", getPaymentSchedule);
 

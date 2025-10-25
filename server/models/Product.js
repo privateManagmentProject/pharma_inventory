@@ -10,19 +10,18 @@ const ProductSchema = new mongoose.Schema({
     },
     description: { type: String, required: true },
     manufacturer: { type: String},
-    soldPrice: { type: String, required: true }, // Changed from price
-    purchasePrice: { type: String, required: true }, // Changed from supplierPrice
+    soldPrice: { type: Number, required: true }, // Changed to Number
+    purchasePrice: { type: Number, required: true }, // Changed to Number
     expiryDate: { type: Date, required: true},
-    stock: { type: String, required: true },
-    lowStockThreshold: { type: Number, default: 500 }, // Changed to 500
-    outOfStockThreshold: { type: Number, default: 100 }, // Added out of stock threshold
+    stock: { type: Number, required: true }, // Changed to Number
+    lowStockThreshold: { type: Number, default: 500 },
+    outOfStockThreshold: { type: Number, default: 100 },
     image: { type: String },
     packageSize: { 
         type: String, 
         required: true,
-        enum: ['carton', 'box', 'bottle', 'pack', 'strip'] // Removed 'unit', added 'carton', 'strip'
+        enum: ['kg', 'box', 'bottle', 'pack', 'pk','tube','vial', 'ampoule','glass','plastic','syrings','sachet','aerosol','spray','bottle','bag','roll','cops','carton','tin','cans','pouches'] // Match sales order enum
     },
-    cartonSize: { type: String }, // New field for carton size
     categoryId: {type: mongoose.Schema.Types.ObjectId, ref: "Category", required: true},
     supplierId: {type: mongoose.Schema.Types.ObjectId, ref: "Supplier", required: true},
     userId: {type: mongoose.Schema.Types.ObjectId, ref: "User", required: true},
@@ -39,7 +38,7 @@ ProductSchema.pre('save', function(next) {
 
 // Virtual for stock status
 ProductSchema.virtual('stockStatus').get(function() {
-    const stock = parseInt(this.stock);
+    const stock = this.stock;
     if (stock <= this.outOfStockThreshold) return 'out';
     if (stock <= this.lowStockThreshold) return 'low';
     return 'available';

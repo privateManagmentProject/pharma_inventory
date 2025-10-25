@@ -63,6 +63,21 @@ const EditSalesOrder = () => {
     }
   };
 
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case "completed":
+        return "bg-green-100 text-green-800";
+      case "cancelled":
+        return "bg-red-100 text-red-800";
+      case "order_progress":
+        return "bg-blue-100 text-blue-800";
+      case "payment_progress":
+        return "bg-purple-100 text-purple-800";
+      default: // order_created
+        return "bg-yellow-100 text-yellow-800";
+    }
+  };
+
   if (loading) return <div>Loading...</div>;
   if (!salesOrder) return <div>Sales order not found</div>;
 
@@ -93,6 +108,16 @@ const EditSalesOrder = () => {
               <p>
                 <strong>Customer:</strong> {salesOrder.customerName}
               </p>
+              {salesOrder.customerTin && (
+                <p>
+                  <strong>TIN:</strong> {salesOrder.customerTin}
+                </p>
+              )}
+              {salesOrder.customerAddress && (
+                <p>
+                  <strong>Address:</strong> {salesOrder.customerAddress}
+                </p>
+              )}
               <p>
                 <strong>Items:</strong> {salesOrder.items.length} products
               </p>
@@ -118,7 +143,14 @@ const EditSalesOrder = () => {
                 <strong>Balance:</strong> ${balance.toFixed(2)}
               </p>
               <p>
-                <strong>Current Status:</strong> {salesOrder.status}
+                <strong>Current Status:</strong>{" "}
+                <span
+                  className={`px-2 py-1 rounded text-xs ${getStatusColor(
+                    salesOrder.status
+                  )}`}
+                >
+                  {salesOrder.status.replace("_", " ").toUpperCase()}
+                </span>
               </p>
               <p>
                 <strong>Payment Status:</strong> {salesOrder.paymentInfo.status}
@@ -132,7 +164,7 @@ const EditSalesOrder = () => {
             <div className="grid grid-cols-1 gap-4">
               {salesOrder.items.map((item, index) => (
                 <div key={index} className="p-4 border rounded-md">
-                  <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
                     <div>
                       <h4 className="font-semibold">Product</h4>
                       <p>{item.productName}</p>
@@ -151,6 +183,10 @@ const EditSalesOrder = () => {
                     <div>
                       <h4 className="font-semibold">Unit Price</h4>
                       <p>${item.unitPrice}</p>
+                    </div>
+                    <div>
+                      <h4 className="font-semibold">Supplier Price</h4>
+                      <p>${item.supplierPrice || item.unitPrice}</p>
                     </div>
                     <div>
                       <h4 className="font-semibold">Total Price</h4>
@@ -210,11 +246,17 @@ const EditSalesOrder = () => {
                         <SelectValue placeholder="Select status" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="pending">Pending</SelectItem>
-                        <SelectItem value="progress">Progress</SelectItem>
-                        <SelectItem value="approved">Approved</SelectItem>
-                        <SelectItem value="rejected">Rejected</SelectItem>
+                        <SelectItem value="order_created">
+                          Order Created
+                        </SelectItem>
+                        <SelectItem value="order_progress">
+                          Order Progress
+                        </SelectItem>
+                        <SelectItem value="payment_progress">
+                          Payment Progress
+                        </SelectItem>
                         <SelectItem value="completed">Completed</SelectItem>
+                        <SelectItem value="cancelled">Cancelled</SelectItem>
                       </SelectContent>
                     </Select>
                     {errors.status && touched.status && (
@@ -246,9 +288,14 @@ const EditSalesOrder = () => {
                     )}
                   </p>
                   <p className="mt-2 text-sm">
-                    Note: Setting status to "Approved" or "Completed" will
-                    automatically update the product stock for all items in the
-                    order.
+                    <strong>Status Flow:</strong>
+                    <br />
+                    • Order Created: Customer places order
+                    <br />
+                    • Order Progress: Supplier confirms order
+                    <br />
+                    • Payment Progress: Payment process starts
+                    <br />• Completed: Order fully paid and delivered
                   </p>
                 </div>
 

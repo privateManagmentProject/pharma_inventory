@@ -1,11 +1,19 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-import { ArrowLeft, Download, Filter } from "lucide-react";
+import { ArrowLeft, Download } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
+import type { Supplier } from "../suppliers/constants/supplier";
 import { getSalesOrderById } from "./api/ salesOrderAPI";
 import type { SalesOrder } from "./constants/salesOrder";
 
@@ -34,14 +42,15 @@ const DetailSalesOrder = () => {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case "approved":
       case "completed":
         return "bg-green-100 text-green-800";
-      case "rejected":
+      case "cancelled":
         return "bg-red-100 text-red-800";
-      case "progress":
+      case "order_progress":
         return "bg-blue-100 text-blue-800";
-      default:
+      case "payment_progress":
+        return "bg-purple-100 text-purple-800";
+      default: // order_created
         return "bg-yellow-100 text-yellow-800";
     }
   };
@@ -72,371 +81,472 @@ const DetailSalesOrder = () => {
     }
   };
 
-  const generatePDF = (supplierName: string | null = null) => {
+  // Modified Customer PDF - Simplified item list, total, supplier name(s), and all accounts (handles multiple suppliers and multiple accounts per supplier)
+  const generateCustomerPDF = () => {
     if (!salesOrder) return;
 
     const doc = new jsPDF();
-    const filteredItems = supplierName
-      ? salesOrder.items.filter((item) => item.supplierName === supplierName)
-      : salesOrder.items;
 
-    // Add header
+    // Header
     doc.setFontSize(20);
     doc.setFont("helvetica", "bold");
-    doc.text("Sales Order Details", 20, 20);
+    doc.text("SALES ORDER - CUSTOMER COPY", 20, 20);
 
-    // Add company info
-    doc.setFontSize(12);
+    // Company Info
+    doc.setFontSize(10);
     doc.setFont("helvetica", "normal");
-    doc.text("Your Company Name", 20, 30);
+    doc.text("Pharma Distributor Inc.", 20, 30);
     doc.text("123 Business St, City, Country", 20, 36);
-    doc.text("Email: info@company.com", 20, 42);
+    doc.text("Phone: +123456789 | Email: info@pharma.com", 20, 42);
 
-    // Add order info
+    // Order Information
     doc.setFontSize(12);
-    doc.text(`Order ID: ${salesOrder._id?.slice(-6)}`, 20, 60);
+    doc.setFont("helvetica", "bold");
+    doc.text("Order Information:", 20, 60);
+    doc.setFont("helvetica", "normal");
+    doc.text(`Order ID: ${salesOrder._id?.slice(-6)}`, 20, 68);
     doc.text(
-      `Created: ${new Date(salesOrder.createdAt).toLocaleDateString()}`,
-      20,
-      68
-    );
-    doc.text(
-      `Payment Due: ${new Date(
-        salesOrder.paymentInfo.dueDate
-      ).toLocaleDateString()}`,
+      `Date: ${new Date(salesOrder.createdAt).toLocaleDateString()}`,
       20,
       76
     );
+    doc.text(`Customer: ${salesOrder.customerName}`, 20, 84);
 
-    // Add filter info if applicable
-    if (supplierName) {
-      doc.text(`Supplier Filter: ${supplierName}`, 20, 84);
-    }
+    // Item list in simplified format
+    let y = 100;
+    let itemNumber = 1;
+    let total = 0;
 
-    // Customer Information
-    autoTable(doc, {
-      startY: supplierName ? 94 : 90,
-      head: [["Customer Information"]],
-      body: [[`Name: ${salesOrder.customerName}`]],
-      theme: "grid",
-      headStyles: {
-        fillColor: [22, 160, 133],
-        textColor: [255, 255, 255],
-        fontSize: 12,
-      },
-      bodyStyles: { fontSize: 10 },
-      margin: { left: 20, right: 20 },
+    salesOrder.items.forEach((item) => {
+      const line = `${itemNumber},${item.productName} ${
+        item.quantity
+      }×${item.unitPrice.toLocaleString()}bir=${item.totalPrice.toLocaleString()}`;
+      doc.text(line, 20, y);
+      y += 10;
+      itemNumber++;
+      total += item.totalPrice;
     });
 
-    // Order Items Table
-    const itemsData = filteredItems.map((item) => [
+    // Total
+    doc.text(`Total ${total.toLocaleString()}bir`, 20, y);
+    y += 10;
+
+    // Collect unique suppliers and their accounts
+    const uniqueSuppliers = new Map();
+    salesOrder.items.forEach((item) => {
+      if (!uniqueSuppliers.has(item.supplierId._id)) {
+        uniqueSuppliers.set(item.supplierId._id, item.supplierId);
+      }
+    });
+
+    uniqueSuppliers.forEach((supplier: Supplier) => {
+      // Supplier name
+      doc.text(supplier.name, 20, y);
+      y += 10;
+
+      // Supplier accounts (handles multiple accounts)
+      supplier.accounts.map((account) => {
+        const accLine = `${account.name}=${account.number}`;
+        doc.text(accLine, 20, y);
+        y += 10;
+      });
+
+      y += 10; // Space between suppliers if multiple
+    });
+
+    doc.save(`customer_order_${salesOrder._id?.slice(-6)}.pdf`);
+  };
+
+  // Supplier PDF - Customer info and products without prices
+  const generateSupplierPDF = (supplierName: string) => {
+    if (!salesOrder) return;
+
+    const doc = new jsPDF();
+    const supplierItems = salesOrder.items.filter(
+      (item) => item.supplierName === supplierName
+    );
+
+    // Header
+    doc.setFontSize(20);
+    doc.setFont("helvetica", "bold");
+    doc.text("ORDER REQUEST - SUPPLIER COPY", 20, 20);
+
+    // Supplier Info
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    doc.text(`To: ${supplierName}`, 20, 30);
+    doc.text(`Date: ${new Date().toLocaleDateString()}`, 20, 36);
+
+    // Customer Information (Detailed)
+    doc.setFont("helvetica", "bold");
+    doc.text("Customer Information:", 20, 50);
+    doc.setFont("helvetica", "normal");
+    doc.text(`Name: ${salesOrder.customerName}`, 20, 58);
+    if (salesOrder.customerTin)
+      doc.text(`TIN: ${salesOrder.customerTin}`, 20, 66);
+    if (salesOrder.customerAddress)
+      doc.text(`Address: ${salesOrder.customerAddress}`, 20, 74);
+    if (salesOrder.customerLicense)
+      doc.text(`License: ${salesOrder.customerLicense}`, 20, 82);
+
+    // Order Items for this supplier (without prices)
+    const itemsData = supplierItems.map((item) => [
       item.productName,
       `${item.quantity} ${item.packageSize}`,
-      `$${item.unitPrice}`,
-      `$${item.totalPrice}`,
-      item.supplierName,
+      item.productCategory || "N/A",
     ]);
 
     autoTable(doc, {
-      startY: (doc as any).lastAutoTable.finalY + 20,
-      head: [["Product", "Quantity", "Unit Price", "Total", "Supplier"]],
+      startY: 95,
+      head: [["Product", "Quantity", "Category"]],
       body: itemsData,
       theme: "grid",
       headStyles: {
-        fillColor: [22, 160, 133],
+        fillColor: [52, 152, 219],
         textColor: [255, 255, 255],
-        fontSize: 12,
+        fontSize: 10,
       },
-      bodyStyles: { fontSize: 10 },
-      margin: { left: 20, right: 20 },
+      bodyStyles: { fontSize: 9 },
     });
 
-    // Payment Information Table
-    const balance =
-      parseFloat(salesOrder.totalAmount) - (salesOrder.paidAmount || 0);
+    doc.save(
+      `supplier_order_${salesOrder._id?.slice(-6)}_${supplierName.replace(
+        /\s+/g,
+        "_"
+      )}.pdf`
+    );
+  };
+
+  // Internal PDF - Complete information with all details
+  const generateInternalPDF = () => {
+    if (!salesOrder) return;
+
+    const doc = new jsPDF();
+
+    // Header
+    doc.setFontSize(20);
+    doc.setFont("helvetica", "bold");
+    doc.text("SALES ORDER - INTERNAL COPY", 20, 20);
+
+    // Company Info
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    doc.text("Pharma Distributor Inc.", 20, 30);
+    doc.text("123 Business St, City, Country", 20, 36);
+
+    // Customer Information
     autoTable(doc, {
-      startY: (doc as any).lastAutoTable.finalY + 20,
-      head: [["Payment Information"]],
+      startY: 50,
+      head: [["Customer Details"]],
       body: [
-        [`Total Amount: $${salesOrder.totalAmount}`],
-        [`Paid Amount: $${salesOrder.paidAmount || 0}`],
-        [`Balance: $${balance.toFixed(2)}`],
-        [`Status: ${salesOrder.status}`],
-        [`Payment Status: ${getPaymentStatus(salesOrder).text}`],
+        [`Name: ${salesOrder.customerName}`],
+        [`TIN: ${salesOrder.customerTin || "N/A"}`],
+        [`Address: ${salesOrder.customerAddress || "N/A"}`],
+        [`License: ${salesOrder.customerLicense || "N/A"}`],
       ],
       theme: "grid",
       headStyles: {
         fillColor: [22, 160, 133],
         textColor: [255, 255, 255],
-        fontSize: 12,
+        fontSize: 10,
       },
-      bodyStyles: { fontSize: 10 },
-      margin: { left: 20, right: 20 },
+      bodyStyles: { fontSize: 9 },
     });
 
-    // Supplier Breakdown (only for filtered items if applicable)
-    const supplierBreakdown: Record<string, number> = {};
-    filteredItems.forEach((item) => {
-      if (!supplierBreakdown[item.supplierName]) {
-        supplierBreakdown[item.supplierName] = 0;
-      }
-      supplierBreakdown[item.supplierName] += parseFloat(item.totalPrice);
+    // Payment Information
+    autoTable(doc, {
+      startY: (doc as any).lastAutoTable.finalY + 20,
+      head: [["Payment Details"]],
+      body: [
+        [`Type: ${salesOrder.paymentInfo.paymentType}`],
+        [
+          `Due Date: ${new Date(
+            salesOrder.paymentInfo.dueDate
+          ).toLocaleDateString()}`,
+        ],
+        [`Status: ${salesOrder.paymentInfo.status}`],
+        [`Total Amount: $${salesOrder.totalAmount}`],
+        [`Paid Amount: $${salesOrder.paidAmount || 0}`],
+        [`Remaining: $${salesOrder.paymentInfo.remainingAmount}`],
+      ],
+      theme: "grid",
+      headStyles: {
+        fillColor: [22, 160, 133],
+        textColor: [255, 255, 255],
+        fontSize: 10,
+      },
+      bodyStyles: { fontSize: 9 },
     });
 
-    const supplierData = Object.entries(supplierBreakdown).map(
-      ([name, total]) => [name, `$${total.toFixed(2)}`]
-    );
+    // Order Items Table with full details
+    const itemsData = salesOrder.items.map((item) => [
+      item.productName,
+      `${item.quantity} ${item.packageSize}`,
+      `$${item.unitPrice}`,
+      `$${item.totalPrice}`,
+      item.supplierName,
+      item.productCategory || "N/A",
+      `$${item.supplierPrice}`,
+    ]);
 
     autoTable(doc, {
       startY: (doc as any).lastAutoTable.finalY + 20,
-      head: [["Supplier", "Total Amount"]],
-      body: supplierData,
+      head: [
+        [
+          "Product",
+          "Quantity",
+          "Unit Price",
+          "Total Price",
+          "Supplier",
+          "Category",
+          "Supplier Price",
+        ],
+      ],
+      body: itemsData,
       theme: "grid",
       headStyles: {
-        fillColor: [52, 73, 94],
+        fillColor: [22, 160, 133],
         textColor: [255, 255, 255],
-        fontSize: 12,
+        fontSize: 10,
       },
-      bodyStyles: { fontSize: 10 },
-      margin: { left: 20, right: 20 },
+      bodyStyles: { fontSize: 9 },
     });
 
-    // Add footer
-    const pageCount = doc.getNumberOfPages();
-    for (let i = 1; i <= pageCount; i++) {
-      doc.setPage(i);
-      doc.setFontSize(8);
-      doc.text(
-        `Page ${i} of ${pageCount}`,
-        20,
-        doc.internal.pageSize.height - 10
-      );
-    }
-
-    const fileName = supplierName
-      ? `sales_order_${salesOrder._id?.slice(-6)}_${supplierName.replace(
-          /\s+/g,
-          "_"
-        )}.pdf`
-      : `sales_order_${salesOrder._id?.slice(-6)}.pdf`;
-
-    doc.save(fileName);
+    doc.save(`internal_order_${salesOrder._id?.slice(-6)}.pdf`);
   };
 
   if (loading) return <div>Loading...</div>;
   if (!salesOrder) return <div>Sales order not found</div>;
 
-  const balance =
-    parseFloat(salesOrder.totalAmount) - (salesOrder.paidAmount || 0);
   const paymentStatus = getPaymentStatus(salesOrder);
 
-  // Get unique suppliers for filtering
-  const uniqueSuppliers = Array.from(
+  // Get unique suppliers for dropdown
+  const suppliers = Array.from(
     new Set(salesOrder.items.map((item) => item.supplierName))
   );
 
   return (
     <div className="container mx-auto p-6">
-      <div className="mb-6 flex justify-between">
-        <Link to="/sales-orders">
+      <div className="mb-6">
+        <Link to="/salesOrders">
           <Button variant="outline">
             <ArrowLeft className="mr-2 h-4 w-4" /> Back to Sales Orders
           </Button>
         </Link>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={() => generatePDF()}>
-            <Download className="mr-2 h-4 w-4" /> Download All
-          </Button>
+      </div>
+
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-3xl font-bold">Sales Order Details</h1>
+        <div className="flex items-center space-x-2">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline">
+                <Download className="mr-2 h-4 w-4" /> Download PDF
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent>
+              <DropdownMenuItem onClick={generateCustomerPDF}>
+                Customer Copy
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              {suppliers.map((supplier) => (
+                <DropdownMenuItem
+                  key={supplier}
+                  onClick={() => generateSupplierPDF(supplier)}
+                >
+                  {supplier} Copy
+                </DropdownMenuItem>
+              ))}
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={generateInternalPDF}>
+                Internal Copy
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+      {/* Status Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <Card>
-          <CardHeader>
-            <CardTitle>Order Information</CardTitle>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-medium">Order Status</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div>
-              <h3 className="font-semibold">Order ID</h3>
-              <p>{salesOrder._id?.slice(-6)}</p>
-            </div>
-            <div>
-              <h3 className="font-semibold">Customer Name</h3>
-              <p>{salesOrder.customerName}</p>
-            </div>
-            <div>
-              <h3 className="font-semibold">Created Date</h3>
-              <p>{new Date(salesOrder.createdAt).toLocaleDateString()}</p>
-            </div>
-            <div>
-              <h3 className="font-semibold">Payment Due Date</h3>
-              <p>
-                {new Date(salesOrder.paymentInfo.dueDate).toLocaleDateString()}
-              </p>
-            </div>
-            <div>
-              <h3 className="font-semibold">Status</h3>
-              <Badge className={getStatusColor(salesOrder.status)}>
-                {salesOrder.status}
-              </Badge>
-            </div>
-            <div>
-              <h3 className="font-semibold">Payment Status</h3>
-              <Badge className={paymentStatus.color}>
-                {paymentStatus.text}
-              </Badge>
-            </div>
+          <CardContent>
+            <Badge className={getStatusColor(salesOrder.status)}>
+              {salesOrder.status.replace("_", " ").toUpperCase()}
+            </Badge>
           </CardContent>
         </Card>
 
         <Card>
-          <CardHeader>
-            <CardTitle>Payment Information</CardTitle>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-medium">
+              Payment Status
+            </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div>
-              <h3 className="font-semibold">Total Amount</h3>
-              <p>${salesOrder.totalAmount}</p>
+          <CardContent>
+            <Badge className={paymentStatus.color}>{paymentStatus.text}</Badge>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-medium">Total Amount</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              ${salesOrder.totalAmount.toFixed(2)}
             </div>
-            <div>
-              <h3 className="font-semibold">Paid Amount</h3>
-              <p>${salesOrder.paidAmount || 0}</p>
-            </div>
-            <div>
-              <h3 className="font-semibold">Balance</h3>
-              <p>${balance.toFixed(2)}</p>
-            </div>
-            {balance === 0 && (
-              <div className="bg-green-50 p-3 rounded-md">
-                <p className="text-green-800 font-medium">Payment Completed</p>
-              </div>
-            )}
-            {balance > 0 && (
-              <div className="bg-yellow-50 p-3 rounded-md">
-                <p className="text-yellow-800 font-medium">
-                  Pending Payment: ${balance.toFixed(2)}
-                </p>
-              </div>
-            )}
+            <p className="text-sm text-muted-foreground">
+              Paid: ${(salesOrder.paidAmount || 0).toFixed(2)} | Balance: $
+              {(salesOrder.totalAmount - (salesOrder.paidAmount || 0)).toFixed(
+                2
+              )}
+            </p>
           </CardContent>
         </Card>
       </div>
 
-      <Card className="mb-6">
+      {/* Customer Information */}
+      <Card>
         <CardHeader>
-          <CardTitle className="flex justify-between items-center">
-            <span>Order Items</span>
-            <div className="flex items-center gap-2">
-              <Filter className="h-4 w-4" />
-              <select
-                className="border rounded-md p-1 text-sm"
-                value={selectedSupplier || ""}
-                onChange={(e) => setSelectedSupplier(e.target.value || null)}
-              >
-                <option value="">All Suppliers</option>
-                {uniqueSuppliers.map((supplier) => (
-                  <option key={supplier} value={supplier}>
-                    {supplier}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </CardTitle>
+          <CardTitle>Customer Information</CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 gap-4">
-            {salesOrder.items
-              .filter(
-                (item) =>
-                  !selectedSupplier || item.supplierName === selectedSupplier
-              )
-              .map((item, index) => (
-                <div key={index} className="p-4 border rounded-md">
-                  <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-                    <div>
-                      <h3 className="font-semibold">Product</h3>
-                      <p>{item.productName}</p>
-                      {item.productCategory && (
-                        <p className="text-sm text-muted-foreground">
-                          Category: {item.productCategory}
-                        </p>
-                      )}
-                    </div>
-                    <div>
-                      <h3 className="font-semibold">Quantity</h3>
-                      <p>
-                        {item.quantity} {item.packageSize}
-                      </p>
-                    </div>
-                    <div>
-                      <h3 className="font-semibold">Unit Price</h3>
-                      <p>${item.unitPrice}</p>
-                    </div>
-                    <div>
-                      <h3 className="font-semibold">Total Price</h3>
-                      <p>${item.totalPrice}</p>
-                    </div>
-                    <div>
-                      <h3 className="font-semibold">Supplier</h3>
-                      <p>{item.supplierName}</p>
-                    </div>
-                  </div>
-                </div>
-              ))}
+        <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="text-sm font-medium">Customer Name</label>
+            <p className="text-sm">{salesOrder.customerName}</p>
+          </div>
+          <div>
+            <label className="text-sm font-medium">TIN Number</label>
+            <p className="text-sm">{salesOrder.customerTin || "N/A"}</p>
+          </div>
+          <div>
+            <label className="text-sm font-medium">Address</label>
+            <p className="text-sm">{salesOrder.customerAddress || "N/A"}</p>
+          </div>
+          <div>
+            <label className="text-sm font-medium">License Number</label>
+            <p className="text-sm">{salesOrder.customerLicense || "N/A"}</p>
           </div>
         </CardContent>
       </Card>
 
+      {/* Order Items */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex justify-between items-center">
-            <span>Supplier Breakdown</span>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => generatePDF(selectedSupplier)}
-              disabled={!selectedSupplier}
-            >
-              <Download className="mr-2 h-4 w-4" /> Download{" "}
-              {selectedSupplier || "Selected"}
-            </Button>
-          </CardTitle>
+          <CardTitle>Order Items</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 gap-4">
-            {(() => {
-              const supplierBreakdown: Record<string, number> = {};
-              salesOrder.items.forEach((item) => {
-                if (!supplierBreakdown[item.supplierName]) {
-                  supplierBreakdown[item.supplierName] = 0;
-                }
-                supplierBreakdown[item.supplierName] += parseFloat(
-                  item.totalPrice
-                );
-              });
-
-              return Object.entries(supplierBreakdown).map(
-                ([name, totalPrice]) => (
-                  <div
-                    key={name}
-                    className="p-4 border rounded-md flex justify-between items-center"
-                  >
-                    <h3 className="font-semibold">{name}</h3>
-                    <div className="flex items-center gap-2">
-                      <p>${totalPrice.toFixed(2)}</p>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => generatePDF(name)}
-                      >
-                        <Download className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                )
-              );
-            })()}
+          <div className="space-y-4">
+            {salesOrder.items.map((item, index) => (
+              <div
+                key={index}
+                className="border rounded-lg p-4 grid grid-cols-1 md:grid-cols-4 gap-4"
+              >
+                <div>
+                  <label className="text-sm font-medium">Product</label>
+                  <p className="text-sm">{item.productName}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {item.productCategory}
+                  </p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Quantity</label>
+                  <p className="text-sm">
+                    {item.quantity} {item.packageSize}
+                  </p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Unit Price</label>
+                  <p className="text-sm">${item.unitPrice.toFixed(2)}</p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Total Price</label>
+                  <p className="text-sm">${item.totalPrice.toFixed(2)}</p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Supplier</label>
+                  <p className="text-sm">{item.supplierName}</p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Supplier Price</label>
+                  <p className="text-sm">${item.supplierPrice.toFixed(2)}</p>
+                </div>
+              </div>
+            ))}
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Payment Information */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Payment Information</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <label className="text-sm font-medium">Payment Type</label>
+              <p className="text-sm capitalize">
+                {salesOrder.paymentInfo.paymentType.replace("-", " ")}
+              </p>
+            </div>
+            <div>
+              <label className="text-sm font-medium">Due Date</label>
+              <p className="text-sm">
+                {new Date(salesOrder.paymentInfo.dueDate).toLocaleDateString()}
+              </p>
+            </div>
+            {salesOrder.paymentInfo.secondPaymentDate && (
+              <div>
+                <label className="text-sm font-medium">
+                  Second Payment Date
+                </label>
+                <p className="text-sm">
+                  {new Date(
+                    salesOrder.paymentInfo.secondPaymentDate
+                  ).toLocaleDateString()}
+                </p>
+              </div>
+            )}
+          </div>
+
+          {salesOrder.paymentInfo.paymentSchedule &&
+            salesOrder.paymentInfo.paymentSchedule.length > 0 && (
+              <div>
+                <label className="text-sm font-medium">Payment Schedule</label>
+                <div className="space-y-2 mt-2">
+                  {salesOrder.paymentInfo.paymentSchedule.map(
+                    (schedule, index) => (
+                      <div
+                        key={index}
+                        className="flex items-center justify-between p-2 border rounded"
+                      >
+                        <span className="text-sm">
+                          {new Date(schedule.date).toLocaleDateString()}
+                        </span>
+                        <span className="text-sm">
+                          ${schedule.amount.toFixed(2)}
+                        </span>
+                        <Badge
+                          className={
+                            schedule.status === "paid"
+                              ? "bg-green-100 text-green-800"
+                              : schedule.status === "overdue"
+                              ? "bg-red-100 text-red-800"
+                              : "bg-yellow-100 text-yellow-800"
+                          }
+                        >
+                          {schedule.status}
+                        </Badge>
+                      </div>
+                    )
+                  )}
+                </div>
+              </div>
+            )}
         </CardContent>
       </Card>
     </div>

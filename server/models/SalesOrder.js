@@ -8,10 +8,11 @@ const SalesOrderItemSchema = new mongoose.Schema({
   packageSize: { 
     type: String, 
     required: true,
-    enum: ['kg', 'box', 'bottle', 'pack', 'unit'] 
+    enum: ['kg', 'box', 'bottle', 'pack', 'pk','tube','vial', 'ampoule','glass','plastic','syrings','sachet','aerosol','spray','bottle','bag','roll','cops','carton','tin','cans','pouches'] 
   },
-  unitPrice: { type: String, required: true },
-  totalPrice: { type: String, required: true },
+  unitPrice: { type: Number, required: true },
+  supplierPrice: { type: Number, required: true },
+  totalPrice: { type: Number, required: true },
   supplierId: { type: mongoose.Schema.Types.ObjectId, ref: "Supplier", required: true },
   supplierName: { type: String, required: true }
 });
@@ -24,8 +25,8 @@ const PaymentInfoSchema = new mongoose.Schema({
     required: true
   },
   dueDate: { type: Date, required: true },
-  secondPaymentDate: { type: Date }, // For two-time payments
-  paymentSchedule: [{ // For date-based payments
+  secondPaymentDate: { type: Date },
+  paymentSchedule: [{
     date: { type: Date, required: true },
     amount: { type: Number, required: true },
     status: { 
@@ -40,53 +41,51 @@ const PaymentInfoSchema = new mongoose.Schema({
     default: 'pending' 
   },
   totalPaidAmount: { type: Number, default: 0 },
-  remainingAmount: { type: Number }
+  remainingAmount: { type: Number, default: 0 }
 });
 
 const SalesOrderSchema = new mongoose.Schema({
   customerId: { type: mongoose.Schema.Types.ObjectId, ref: "Customer", required: true },
   customerName: { type: String, required: true },
-  // REMOVED userId field
+  customerTin: { type: String },
+  customerAddress: { type: String },
+  customerLicense: { type: String },
   items: [SalesOrderItemSchema],
-  totalAmount: { type: String, required: true },
+  totalAmount: { type: Number, required: true },
   paidAmount: { type: Number, default: 0 },
-  unpaidAmount: { type: Number, default: function() { return parseFloat(this.totalAmount); } },
+  unpaidAmount: { type: Number, default: 0 },
   paymentInfo: PaymentInfoSchema,
   status: { 
     type: String, 
-    enum: ['pending', 'progress', 'approved', 'rejected', 'completed'], 
-    default: 'pending' 
+    enum: ['order_created', 'order_progress', 'payment_progress', 'completed', 'cancelled'], 
+    default: 'order_created' 
   },
   notes: { type: String },
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now }
 });
 
-// Pre-save middleware to update payment status and unpaid amount
+// Pre-save middleware
 SalesOrderSchema.pre('save', function(next) {
-  const total = parseFloat(this.totalAmount);
+  const total = this.totalAmount || 0;
   const paid = this.paidAmount || 0;
-  this.unpaidAmount = total - paid;
+  
+  this.unpaidAmount = isNaN(total - paid) ? total : total - paid;
   this.updatedAt = new Date();
   
-  // Update payment info - FIX: Check if paymentInfo exists
   if (this.paymentInfo) {
     this.paymentInfo.totalPaidAmount = paid;
-    this.paymentInfo.remainingAmount = total - paid;
+    this.paymentInfo.remainingAmount = isNaN(total - paid) ? total : total - paid;
     
-    // Update payment status based on payment type
     if (paid >= total) {
       this.paymentInfo.status = 'completed';
-      this.status = 'completed';
     } else if (paid > 0) {
       this.paymentInfo.status = 'partial';
-      this.status = 'progress';
     } else {
       this.paymentInfo.status = 'pending';
-      this.status = 'pending';
     }
 
-    // Check if overdue based on payment type
+    // Overdue check
     const today = new Date();
     let isOverdue = false;
     
@@ -100,11 +99,6 @@ SalesOrderSchema.pre('save', function(next) {
       const secondDue = new Date(this.paymentInfo.secondPaymentDate);
       isOverdue = (this.paymentInfo.status !== 'completed' && today > firstDue) || 
                   (this.paymentInfo.status !== 'completed' && today > secondDue);
-    } else if (paymentType === 'date-based' && this.paymentInfo.paymentSchedule) {
-      // Check if any scheduled payment is overdue
-      isOverdue = this.paymentInfo.paymentSchedule.some(schedule => 
-        schedule.status === 'pending' && today > schedule.date
-      );
     }
     
     if (isOverdue) {

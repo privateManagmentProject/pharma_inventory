@@ -22,12 +22,12 @@ import { addProduct } from "./api/productAPI";
 const validationSchema = Yup.object({
   name: Yup.string().required("Product name is required"),
   description: Yup.string().required("Description is required"),
-  price: Yup.number()
-    .required("Price is required")
-    .positive("Price must be positive"),
-  supplierPrice: Yup.number()
-    .required("Supplier price is required")
-    .positive("Supplier price must be positive"),
+  soldPrice: Yup.number()
+    .required("Sold price is required")
+    .positive("Sold price must be positive"),
+  purchasePrice: Yup.number()
+    .required("Purchase price is required")
+    .positive("Purchase price must be positive"),
   stock: Yup.number()
     .required("Stock is required")
     .integer("Stock must be a whole number")
@@ -43,10 +43,10 @@ const validationSchema = Yup.object({
 const NewProduct = () => {
   const navigate = useNavigate();
   const [imageFile, setImageFile] = useState<File | null>(null);
-
   const [categories, setCategories] = useState<any[]>([]);
   const [suppliers, setSuppliers] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Fetch categories and suppliers on component mount
   useEffect(() => {
@@ -67,13 +67,21 @@ const NewProduct = () => {
     };
     fetchData();
   }, []);
+
   const handleSubmit = async (values: any) => {
     try {
+      setIsSubmitting(true);
       const formData = new FormData();
 
       // Append all form fields
       Object.keys(values).forEach((key) => {
-        formData.append(key, values[key]);
+        if (
+          values[key] !== undefined &&
+          values[key] !== null &&
+          values[key] !== ""
+        ) {
+          formData.append(key, values[key]);
+        }
       });
 
       // Append image file if selected
@@ -81,12 +89,19 @@ const NewProduct = () => {
         formData.append("image", imageFile);
       }
 
+      // Only call addProduct for new product creation
       await addProduct(formData);
+
       navigate("/admin/products");
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error adding product:", error);
+      alert(error.response?.data?.message || "Error adding product");
+    } finally {
+      setIsSubmitting(false);
     }
   };
+
+  if (loading) return <div>Loading...</div>;
 
   return (
     <div className="container mx-auto p-6">
@@ -107,20 +122,22 @@ const NewProduct = () => {
             initialValues={{
               name: "",
               brandName: "",
+              brandRate: "good",
               description: "",
               manufacturer: "",
-              price: "",
-              supplierPrice: "",
+              soldPrice: "",
+              purchasePrice: "",
               expiryDate: "",
               stock: "",
               packageSize: "",
+              cartonSize: "",
               categoryId: "",
               supplierId: "",
             }}
             validationSchema={validationSchema}
             onSubmit={handleSubmit}
           >
-            {({ isSubmitting, errors, touched, setFieldValue }) => (
+            {({ errors, touched, setFieldValue }) => (
               <Form className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
@@ -144,6 +161,25 @@ const NewProduct = () => {
                       name="brandName"
                       placeholder="Enter brand name"
                     />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="brandRate">Brand Rate</Label>
+                    <Select
+                      onValueChange={(value) =>
+                        setFieldValue("brandRate", value)
+                      }
+                      defaultValue="good"
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select brand rate" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="good">Good</SelectItem>
+                        <SelectItem value="very good">Very Good</SelectItem>
+                        <SelectItem value="excellent">Excellent</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
 
                   <div>
@@ -173,31 +209,33 @@ const NewProduct = () => {
                   </div>
 
                   <div>
-                    <Label htmlFor="price">Price</Label>
+                    <Label htmlFor="soldPrice">Sold Price</Label>
                     <Field
                       as={Input}
-                      id="price"
-                      name="price"
+                      id="soldPrice"
+                      name="soldPrice"
                       type="number"
-                      placeholder="Enter price"
+                      placeholder="Enter sold price"
                     />
-                    {errors.price && touched.price && (
-                      <div className="text-red-500 text-sm">{errors.price}</div>
+                    {errors.soldPrice && touched.soldPrice && (
+                      <div className="text-red-500 text-sm">
+                        {errors.soldPrice}
+                      </div>
                     )}
                   </div>
 
                   <div>
-                    <Label htmlFor="supplierPrice">Supplier Price</Label>
+                    <Label htmlFor="purchasePrice">Purchase Price</Label>
                     <Field
                       as={Input}
-                      id="supplierPrice"
-                      name="supplierPrice"
+                      id="purchasePrice"
+                      name="purchasePrice"
                       type="number"
-                      placeholder="Enter supplier price"
+                      placeholder="Enter purchase price"
                     />
-                    {errors.supplierPrice && touched.supplierPrice && (
+                    {errors.purchasePrice && touched.purchasePrice && (
                       <div className="text-red-500 text-sm">
-                        {errors.supplierPrice}
+                        {errors.purchasePrice}
                       </div>
                     )}
                   </div>
@@ -232,7 +270,7 @@ const NewProduct = () => {
                   </div>
 
                   <div>
-                    <Label htmlFor="packageSize">Package Size</Label>
+                    <Label htmlFor="packageSize">Unit</Label>
                     <Select
                       onValueChange={(value) =>
                         setFieldValue("packageSize", value)
@@ -242,11 +280,28 @@ const NewProduct = () => {
                         <SelectValue placeholder="Select package size" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="kg">kg</SelectItem>
-                        <SelectItem value="box">box</SelectItem>
-                        <SelectItem value="bottle">bottle</SelectItem>
-                        <SelectItem value="pack">pack</SelectItem>
-                        <SelectItem value="unit">unit</SelectItem>
+                        <SelectItem value="kg">Kg</SelectItem>
+                        <SelectItem value="box">Box</SelectItem>
+                        <SelectItem value="bottle">Bottle</SelectItem>
+                        <SelectItem value="pack">Pack</SelectItem>
+                        <SelectItem value="pk">Pk</SelectItem>
+                        <SelectItem value="tube">Tube</SelectItem>
+                        <SelectItem value="vial">Vial</SelectItem>
+                        <SelectItem value="ampoule">Ampoule</SelectItem>
+                        <SelectItem value="glass">Glass</SelectItem>
+                        <SelectItem value="plastic">Plastic</SelectItem>
+                        <SelectItem value="syrings">Syrings</SelectItem>
+                        <SelectItem value="sachet">Sachet</SelectItem>
+                        <SelectItem value="aerosol">Aerosol</SelectItem>
+                        <SelectItem value="spray">Spray</SelectItem>
+                        <SelectItem value="bottle">Bottle</SelectItem>
+                        <SelectItem value="bag">Bag</SelectItem>
+                        <SelectItem value="roll">Roll</SelectItem>
+                        <SelectItem value="cops">Cops</SelectItem>
+                        <SelectItem value="carton">Carton</SelectItem>
+                        <SelectItem value="tin">Tin</SelectItem>
+                        <SelectItem value="cans">Cans</SelectItem>
+                        <SelectItem value="pouches">Pouches</SelectItem>
                       </SelectContent>
                     </Select>
                     {errors.packageSize && touched.packageSize && (
@@ -254,6 +309,16 @@ const NewProduct = () => {
                         {errors.packageSize}
                       </div>
                     )}
+                  </div>
+
+                  <div>
+                    <Label htmlFor="cartonSize">Carton Size</Label>
+                    <Field
+                      as={Input}
+                      id="cartonSize"
+                      name="cartonSize"
+                      placeholder="Enter carton size (e.g., 10x10)"
+                    />
                   </div>
 
                   <div>
@@ -269,7 +334,7 @@ const NewProduct = () => {
                       <SelectContent>
                         {categories.map((category: any) => (
                           <SelectItem key={category._id} value={category._id}>
-                            {category.categoryName}
+                            {category.categoryName || category.name}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -326,7 +391,7 @@ const NewProduct = () => {
                   <Button
                     type="button"
                     variant="outline"
-                    onClick={() => navigate("/products")}
+                    onClick={() => navigate("/admin/products")}
                   >
                     Cancel
                   </Button>

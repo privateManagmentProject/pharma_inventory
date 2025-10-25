@@ -7,8 +7,9 @@ export interface SalesOrderItem {
   productCategory: string;
   quantity: number;
   packageSize: string;
-  unitPrice: string;
-  totalPrice: string;
+  unitPrice: number; // Changed from string to number
+  supplierPrice: number; // Changed from string to number
+  totalPrice: number; // Changed from string to number
   supplierId: string | { _id: string; name: string };
   supplierName: string;
 }
@@ -16,9 +17,8 @@ export interface SalesOrderItem {
 export interface PaymentInfo {
   paymentType: "one-time" | "two-time" | "date-based";
   dueDate: string;
-  secondPaymentDate?: string; // For two-time payments
+  secondPaymentDate?: string;
   paymentSchedule?: Array<{
-    // For date-based payments
     date: string;
     amount: number;
     status: "pending" | "paid" | "overdue";
@@ -32,32 +32,21 @@ export interface SalesOrder {
   _id?: string;
   customerId: string | { _id: string; name: string };
   items: SalesOrderItem[];
-  totalAmount: string;
+  totalAmount: number; // Changed from string to number
   paidAmount: number;
   unpaidAmount: number;
   paymentInfo: PaymentInfo;
-  status: "pending" | "progress" | "approved" | "rejected" | "completed";
+  status:
+    | "order_created"
+    | "order_progress"
+    | "payment_progress"
+    | "completed"
+    | "cancelled";
   customerName: string;
+  customerTin?: string;
+  customerAddress?: string;
+  customerLicense?: string;
   createdAt: string;
   updatedAt: string;
-  notes?: string;
-}
-
-export interface SalesOrderFormData {
-  customerId: string;
-  paymentInfo: {
-    paymentType: string;
-    dueDate: string;
-    secondPaymentDate?: string;
-    paymentSchedule?: Array<{
-      date: string;
-      amount: number;
-    }>;
-  };
-  items: {
-    productId: string;
-    quantity: number;
-    packageSize: string;
-  }[];
   notes?: string;
 }
