@@ -62,7 +62,7 @@ const createSupplier = async (req, res) => {
 
       const newSupplier = new SupplierModal({
         name, 
-        email, 
+        email : email || "",
         phone, 
         address,
         description: description || "",
