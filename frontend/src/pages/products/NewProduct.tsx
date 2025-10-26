@@ -106,7 +106,7 @@ const NewProduct = () => {
   return (
     <div className="container mx-auto p-6">
       <div className="mb-6">
-        <Link to="/products">
+        <Link to="/admin/products">
           <Button variant="outline">
             <ArrowLeft className="mr-2 h-4 w-4" /> Back to Products
           </Button>
