@@ -86,10 +86,7 @@ const createProduct = async (req, res) => {
         lowStockThreshold 
       } = req.body;
       
-      // Validate required fields
-      if (!name || !description || !soldPrice || !purchasePrice || !expiryDate || !stock || !packageSize || !categoryId || !supplierId) {
-        return res.status(400).json({ success: false, message: "All required fields must be filled" });
-      }
+     
 
       // Check if product already exists
       const existingProduct = await ProductModel.findOne({ name, userId: req.user._id });

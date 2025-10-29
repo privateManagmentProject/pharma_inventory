@@ -32,9 +32,7 @@ const createSupplier = async (req, res) => {
 
       const { name, email, phone, address, description, tinNumber, accounts } = req.body;
       
-      const existingSupplier = await SupplierModal.findOne({ 
-        $or: [ { tinNumber }] 
-      });
+      const existingSupplier = await SupplierModal.findOne({name});
       
       if (existingSupplier) {
         return res.status(400).json({ success: false, message: "Supplier already exists" });
@@ -62,7 +60,7 @@ const createSupplier = async (req, res) => {
 
       const newSupplier = new SupplierModal({
         name, 
-        email : email || "",
+        email,
         phone, 
         address,
         description: description || "",
