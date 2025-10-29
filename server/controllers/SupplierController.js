@@ -57,10 +57,11 @@ const createSupplier = async (req, res) => {
       if (parsedAccounts.length > 0 && !parsedAccounts.some(acc => acc.isDefault)) {
         parsedAccounts[0].isDefault = true;
       }
+    const supplierEmail = email && email.trim() !== "" ? email : null;
 
       const newSupplier = new SupplierModal({
         name, 
-        email,
+        email : supplierEmail,
         phone, 
         address,
         description: description || "",
@@ -71,6 +72,7 @@ const createSupplier = async (req, res) => {
       });
       
       await newSupplier.save();
+      console.log("Supplier created:", newSupplier);
       return res.status(201).json({ success: true, message: "Supplier added successfully", supplier: newSupplier });
     });
   } catch(error) {
@@ -122,7 +124,7 @@ const updateSupplier = async (req, res) => {
       const duplicate = await SupplierModal.findOne({
         $and: [
           { _id: { $ne: id } },
-          { $or: [{ email }, { tinNumber }] }
+          { $or: [ { tinNumber }] }
         ]
       });
       
