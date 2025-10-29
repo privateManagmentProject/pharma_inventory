@@ -1,20 +1,20 @@
 import mongoose from "mongoose";
 
 const SalesOrderItemSchema = new mongoose.Schema({
-  productId: { type: mongoose.Schema.Types.ObjectId, ref: "Product", required: true },
-  productName: { type: String, required: true },
+  productId: { type: mongoose.Schema.Types.ObjectId, ref: "Product"},
+  productName: { type: String},
   productCategory: { type: String },
-  quantity: { type: Number, required: true },
+  quantity: { type: Number},
   packageSize: { 
     type: String, 
     required: true,
     enum: ['kg', 'box', 'bottle', 'pack', 'pk','tube','vial', 'ampoule','glass','plastic','syrings','sachet','aerosol','spray','bottle','bag','roll','cops','carton','tin','cans','pouches'] 
   },
-  unitPrice: { type: Number, required: true },
-  supplierPrice: { type: Number, required: true },
-  totalPrice: { type: Number, required: true },
-  supplierId: { type: mongoose.Schema.Types.ObjectId, ref: "Supplier", required: true },
-  supplierName: { type: String, required: true }
+  unitPrice: { type: Number},
+  supplierPrice: { type: Number},
+  totalPrice: { type: Number},
+  supplierId: { type: mongoose.Schema.Types.ObjectId, ref: "Supplier"},
+  supplierName: { type: String}
 });
 
 const PaymentInfoSchema = new mongoose.Schema({
@@ -24,11 +24,11 @@ const PaymentInfoSchema = new mongoose.Schema({
     default: 'one-time',
     required: true
   },
-  dueDate: { type: Date, required: true },
+  dueDate: { type: Date},
   secondPaymentDate: { type: Date },
   paymentSchedule: [{
-    date: { type: Date, required: true },
-    amount: { type: Number, required: true },
+    date: { type: Date},
+    amount: { type: Number},
     status: { 
       type: String, 
       enum: ['pending', 'paid', 'overdue'], 
@@ -45,13 +45,13 @@ const PaymentInfoSchema = new mongoose.Schema({
 });
 
 const SalesOrderSchema = new mongoose.Schema({
-  customerId: { type: mongoose.Schema.Types.ObjectId, ref: "Customer", required: true },
-  customerName: { type: String, required: true },
+  customerId: { type: mongoose.Schema.Types.ObjectId, ref: "Customer"},
+  customerName: { type: String},
   customerTin: { type: String },
   customerAddress: { type: String },
   customerLicense: { type: String },
   items: [SalesOrderItemSchema],
-  totalAmount: { type: Number, required: true },
+  totalAmount: { type: Number},
   paidAmount: { type: Number, default: 0 },
   unpaidAmount: { type: Number, default: 0 },
   paymentInfo: PaymentInfoSchema,

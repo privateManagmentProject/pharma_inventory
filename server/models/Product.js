@@ -1,19 +1,19 @@
 import mongoose from "mongoose";
 
 const ProductSchema = new mongoose.Schema({ 
-    name: { type: String, required: true },
+    name: { type: String },
     brandName: { type: String },
     brandRate: { 
         type: String, 
         enum: ['good', 'very good', 'excellent'],
         default: 'good'
     },
-    description: { type: String, required: true },
+    description: { type: String },
     manufacturer: { type: String},
-    soldPrice: { type: Number, required: true }, // Changed to Number
-    purchasePrice: { type: Number, required: true }, // Changed to Number
-    expiryDate: { type: Date, required: true},
-    stock: { type: Number, required: true }, // Changed to Number
+    soldPrice: { type: Number }, // Changed to Number
+    purchasePrice: { type: Number }, // Changed to Number
+    expiryDate: { type: Date},
+    stock: { type: Number }, // Changed to Number
     lowStockThreshold: { type: Number, default: 500 },
     outOfStockThreshold: { type: Number, default: 100 },
     image: { type: String },
@@ -22,9 +22,9 @@ const ProductSchema = new mongoose.Schema({
         required: true,
         enum: ['kg', 'box', 'bottle', 'pack', 'pk','tube','vial', 'ampoule','glass','plastic','syrings','sachet','aerosol','spray','bottle','bag','roll','cops','carton','tin','cans','pouches'] // Match sales order enum
     },
-    categoryId: {type: mongoose.Schema.Types.ObjectId, ref: "Category", required: true},
-    supplierId: {type: mongoose.Schema.Types.ObjectId, ref: "Supplier", required: true},
-    userId: {type: mongoose.Schema.Types.ObjectId, ref: "User", required: true},
+    categoryId: {type: mongoose.Schema.Types.ObjectId, ref: "Category"},
+    supplierId: {type: mongoose.Schema.Types.ObjectId, ref: "Supplier"},
+    userId: {type: mongoose.Schema.Types.ObjectId, ref: "User"},
     isActive: { type: Boolean, default: true },
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now }
