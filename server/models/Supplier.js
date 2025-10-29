@@ -25,11 +25,7 @@ const SupplierSchema = new mongoose.Schema({
     tinNumber: { type: String },
     licenses: [LicenseSchema],
     accounts: [AccountSchema],
-    userId: { 
-        type: mongoose.Schema.Types.ObjectId, 
-        ref: "User",
-        required: true 
-    },
+    userId: {type: mongoose.Schema.Types.ObjectId, ref: "User"},
     isActive: { type: Boolean, default: true },
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now }
