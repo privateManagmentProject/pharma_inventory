@@ -16,12 +16,14 @@ const ProductSchema = new mongoose.Schema({
     stock: { type: Number }, // Changed to Number
     lowStockThreshold: { type: Number, default: 500 },
     outOfStockThreshold: { type: Number, default: 100 },
+
     image: { type: String },
     packageSize: { 
         type: String, 
         required: true,
         enum: ['kg', 'box', 'bottle', 'pack', 'pk','tube','vial', 'ampoule','glass','plastic','syrings','sachet','aerosol','spray','bottle','bag','roll','cops','carton','tin','cans','pouches'] // Match sales order enum
     },
+    cartonSize: { type: String },
     categoryId: {type: mongoose.Schema.Types.ObjectId, ref: "Category"},
     supplierId: {type: mongoose.Schema.Types.ObjectId, ref: "Supplier"},
     userId: {type: mongoose.Schema.Types.ObjectId, ref: "User"},
