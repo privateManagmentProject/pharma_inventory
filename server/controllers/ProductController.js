@@ -3,150 +3,194 @@ import multer from "multer";
 import path from "path";
 import ProductModel from "../models/Product.js";
 
-// Ensure uploads directory exists
-const ensureUploadsDir = () => {
-  const uploadsDir = path.join(process.cwd(), 'uploads');
-  if (!fs.existsSync(uploadsDir)) {
-    fs.mkdirSync(uploadsDir, { recursive: true });
-  }
-  return uploadsDir;
-};
-
-// Configure multer for file uploads with better error handling
+// Temporary disk storage for file uploads
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
-    const uploadsDir = ensureUploadsDir();
-    cb(null, uploadsDir);
+    const uploadDir = 'uploads/products/';
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
+    }
+    cb(null, uploadDir);
   },
   filename: function (req, file, cb) {
-    // Create unique filename with timestamp and random string
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    const fileExtension = path.extname(file.originalname);
-    cb(null, 'product-' + uniqueSuffix + fileExtension);
+    cb(null, uniqueSuffix + path.extname(file.originalname));
   }
 });
 
-// File filter function
-const fileFilter = (req, file, cb) => {
-  // Check if file is an image
-  if (file.mimetype.startsWith('image/')) {
-    cb(null, true);
-  } else {
-    cb(new Error('Only image files are allowed! Please upload JPG, PNG, or GIF files.'), false);
-  }
-};
-
-// Configure multer
 const upload = multer({ 
   storage: storage,
-  fileFilter: fileFilter,
+  fileFilter: function (req, file, cb) {
+    if (file.mimetype.startsWith('image/')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only image files are allowed!'), false);
+    }
+  },
   limits: {
     fileSize: 5 * 1024 * 1024, // 5MB limit
-    files: 1 // Only one file
   }
 }).single('image');
 
-// Helper function to get base URL
-const getBaseUrl = (req) => {
-  if (process.env.NODE_ENV === 'production') {
-    return `${req.protocol}://${req.get('host')}`;
+// Helper function to upload to Cloudinary using dynamic import
+const uploadToCloudinary = async (filePath, folder = "product-images") => {
+  try {
+    console.log('Uploading to Cloudinary:', filePath);
+    
+    // Dynamically import cloudinary
+    const { v2: cloudinary } = await import('cloudinary');
+    
+    // Configure Cloudinary
+    cloudinary.config({
+      cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+      api_key: process.env.CLOUDINARY_API_KEY,
+      api_secret: process.env.CLOUDINARY_API_SECRET,
+    });
+    
+    const result = await cloudinary.uploader.upload(filePath, {
+      folder: folder,
+      resource_type: "auto",
+      use_filename: true,
+      unique_filename: true
+    });
+    
+    console.log('Cloudinary upload successful:', result.secure_url);
+    
+    // Delete local file after successful upload
+    if (fs.existsSync(filePath)) {
+      fs.unlinkSync(filePath);
+    }
+    
+    return {
+      path: result.secure_url,
+      publicId: result.public_id,
+      name: path.basename(filePath),
+      type: result.resource_type
+    };
+  } catch (error) {
+    console.error('Cloudinary upload error:', error);
+    
+    // Delete local file if upload fails
+    if (fs.existsSync(filePath)) {
+      fs.unlinkSync(filePath);
+    }
+    
+    throw new Error(`Failed to upload file to Cloudinary: ${error.message}`);
   }
-  return `${req.protocol}://${req.get('host')}`;
+};
+
+// Helper function to delete from Cloudinary
+const deleteFromCloudinary = async (publicId) => {
+  try {
+    const { v2: cloudinary } = await import('cloudinary');
+    
+    // Configure Cloudinary
+    cloudinary.config({
+      cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+      api_key: process.env.CLOUDINARY_API_KEY,
+      api_secret: process.env.CLOUDINARY_API_SECRET,
+    });
+    
+    await cloudinary.uploader.destroy(publicId);
+    console.log('Cloudinary delete successful:', publicId);
+  } catch (error) {
+    console.error('Cloudinary delete error:', error);
+    throw error;
+  }
 };
 
 const createProduct = async (req, res) => {
   try {
     upload(req, res, async function (err) {
       if (err) {
-        if (err instanceof multer.MulterError) {
-          if (err.code === 'LIMIT_FILE_SIZE') {
-            return res.status(400).json({ success: false, message: "File too large. Maximum size is 5MB." });
-          }
-          if (err.code === 'LIMIT_FILE_COUNT') {
-            return res.status(400).json({ success: false, message: "Too many files. Only one file allowed." });
-          }
-        }
+        console.error("Upload error:", err);
         return res.status(400).json({ success: false, message: err.message });
       }
 
-      const { 
-        name, 
-        brandName, 
-        brandRate, 
-        description, 
-        manufacturer, 
-        soldPrice, 
-        purchasePrice, 
-        expiryDate, 
-        stock, 
-        packageSize, 
-        cartonSize, 
-        categoryId, 
-        supplierId, 
-        lowStockThreshold 
-      } = req.body;
-      
-     
-
-      // Check if product already exists
-      const existingProduct = await ProductModel.findOne({ name, userId: req.user._id });
-      if(existingProduct){
-        return res.status(400).json({ success: false, message: "Product already exists"});
-      }
-
-      // Handle image path
-      let imagePath = null;
-      if (req.file) {
-        // Store relative path for flexibility
-        imagePath = `/uploads/${req.file.filename}`;
+      try {
+        const { 
+          name, 
+          brandName, 
+          brandRate, 
+          description, 
+          manufacturer, 
+          soldPrice, 
+          purchasePrice, 
+          expiryDate, 
+          stock, 
+          packageSize, 
+          cartonSize, 
+          categoryId, 
+          supplierId, 
+          lowStockThreshold 
+        } = req.body;
         
-        // For production, you might want to store the full URL
-        if (process.env.NODE_ENV === 'production') {
-          imagePath = `${getBaseUrl(req)}/uploads/${req.file.filename}`;
+        console.log("Request body:", req.body);
+        console.log("Uploaded file:", req.file);
+        
+        // Upload image to Cloudinary if provided
+        let imageData = null;
+        if (req.file) {
+          try {
+            const cloudinaryResult = await uploadToCloudinary(req.file.path);
+            imageData = {
+              path: cloudinaryResult.path,
+              publicId: cloudinaryResult.publicId,
+              name: req.file.originalname,
+              type: req.file.mimetype
+            };
+          } catch (uploadError) {
+            console.error("Cloudinary upload error:", uploadError);
+          }
         }
+        
+        const newProduct = new ProductModel({
+          name: name || "",
+          brandName: brandName || "",
+          brandRate: brandRate || "good",
+          description: description || "",
+          manufacturer: manufacturer || "",
+          soldPrice: soldPrice ? parseFloat(soldPrice) : 0,
+          purchasePrice: purchasePrice ? parseFloat(purchasePrice) : 0,
+          expiryDate: expiryDate || new Date(),
+          stock: stock ? parseInt(stock) : 0,
+          packageSize: packageSize || "kg",
+          cartonSize: cartonSize || "",
+          categoryId: categoryId || null,
+          supplierId: supplierId || null,
+          lowStockThreshold: lowStockThreshold ? parseInt(lowStockThreshold) : 500,
+          outOfStockThreshold: 100,
+          userId: req.user._id,
+          image: imageData ? imageData.path : null,
+          imagePublicId: imageData ? imageData.publicId : null
+        });
+        
+        await newProduct.save();
+        
+        // Populate the saved product for response
+        const populatedProduct = await ProductModel.findById(newProduct._id)
+          .populate('categoryId', 'name categoryName')
+          .populate('supplierId', 'name email');
+        
+        console.log("Product created successfully:", newProduct._id);
+        return res.status(201).json({ 
+          success: true, 
+          message: "Product added successfully", 
+          product: populatedProduct 
+        });
+      } catch (innerError) {
+        console.error("Inner create product error:", innerError);
+        return res.status(500).json({ success: false, message: "Server error: " + innerError.message });
       }
-
-      const newProduct = new ProductModel({
-        name, 
-        brandName, 
-        brandRate: brandRate || 'good',
-        description, 
-        manufacturer, 
-        soldPrice,
-        purchasePrice,
-        expiryDate, 
-        stock, 
-        packageSize, 
-        cartonSize,
-        categoryId, 
-        supplierId,
-        lowStockThreshold: lowStockThreshold || 500,
-        outOfStockThreshold: 100,
-        userId: req.user._id,
-        image: imagePath
-      });
-      
-      await newProduct.save();
-      
-      // Populate the saved product for response
-      const populatedProduct = await ProductModel.findById(newProduct._id)
-        .populate('categoryId', 'name')
-        .populate('supplierId', 'name email');
-      
-      return res.status(201).json({ 
-        success: true, 
-        message: "Product added successfully", 
-        product: populatedProduct 
-      });
     });
   } catch(error) {
     console.error("Create product error:", error);
-    return res.status(500).json({ success: false, message: "Server error"});
+    return res.status(500).json({ success: false, message: "Server error: " + error.message });
   }
 };
 
 const getProducts = async(req, res) => {
-  try {  
+  try {
     const { 
       search, 
       category, 
@@ -213,8 +257,8 @@ const getProducts = async(req, res) => {
     const skip = (parseInt(page) - 1) * parseInt(limit);
 
     const products = await ProductModel.find(filter)
-      .populate('categoryId', 'name')
-      .populate('supplierId', 'name email')
+      .populate('categoryId', 'categoryName')
+      .populate('supplierId', 'name')
       .sort(sortOptions)
       .skip(skip)
       .limit(parseInt(limit));
@@ -238,57 +282,70 @@ const updateProduct = async (req, res) => {
   try {
     upload(req, res, async function (err) {
       if (err) {
-        if (err instanceof multer.MulterError) {
-          if (err.code === 'LIMIT_FILE_SIZE') {
-            return res.status(400).json({ success: false, message: "File too large. Maximum size is 5MB." });
-          }
-        }
+        console.error("Upload error:", err);
         return res.status(400).json({ success: false, message: err.message });
       }
 
-      const { id } = req.params;
-      const updateData = req.body;
-      
-      // Check if product exists
-      const existingProduct = await ProductModel.findById(id);
-      if (!existingProduct) {
-        return res.status(404).json({ success: false, message: "Product not found"});
-      }
-      
-      // Role-based access control
-      if (req.user.role !== 'admin' && existingProduct.userId.toString() !== req.user._id.toString()) {
-        return res.status(403).json({ success: false, message: "Access denied"});
-      }
-      
-      // Handle image upload
-      if (req.file) {
-        // Delete old image if exists
-        if (existingProduct.image && existingProduct.image.includes('/uploads/')) {
-          const oldImagePath = path.join(process.cwd(), existingProduct.image);
-          if (fs.existsSync(oldImagePath)) {
-            fs.unlinkSync(oldImagePath);
+      try {
+        const { id } = req.params;
+        const updateData = req.body;
+        
+        // Check if product exists
+        const existingProduct = await ProductModel.findById(id);
+        if (!existingProduct) {
+          return res.status(404).json({ success: false, message: "Product not found"});
+        }
+        
+        // Role-based access control
+        if (req.user.role !== 'admin' && existingProduct.userId.toString() !== req.user._id.toString()) {
+          return res.status(403).json({ success: false, message: "Access denied"});
+        }
+
+        // Handle image upload to Cloudinary
+        if (req.file) {
+          // Delete old image from Cloudinary if exists
+          if (existingProduct.imagePublicId) {
+            try {
+              await deleteFromCloudinary(existingProduct.imagePublicId);
+            } catch (error) {
+              console.error("Error deleting old image from Cloudinary:", error);
+            }
+          }
+          
+          // Upload new image to Cloudinary
+          try {
+            const cloudinaryResult = await uploadToCloudinary(req.file.path);
+            updateData.image = cloudinaryResult.path;
+            updateData.imagePublicId = cloudinaryResult.publicId;
+          } catch (uploadError) {
+            console.error("Cloudinary upload error:", uploadError);
           }
         }
         
-        // Set new image path
-        updateData.image = `/uploads/${req.file.filename}`;
-        if (process.env.NODE_ENV === 'production') {
-          updateData.image = `${getBaseUrl(req)}/uploads/${req.file.filename}`;
-        }
+        // Convert numeric fields
+        if (updateData.soldPrice) updateData.soldPrice = parseFloat(updateData.soldPrice);
+        if (updateData.purchasePrice) updateData.purchasePrice = parseFloat(updateData.purchasePrice);
+        if (updateData.stock) updateData.stock = parseInt(updateData.stock);
+        if (updateData.lowStockThreshold) updateData.lowStockThreshold = parseInt(updateData.lowStockThreshold);
+        
+        updateData.updatedAt = new Date();
+        
+        const updatedProduct = await ProductModel.findByIdAndUpdate(
+          id, 
+          updateData,
+          { new: true, runValidators: true }
+        ).populate('categoryId', 'name categoryName')
+         .populate('supplierId', 'name email');
+        
+        return res.status(200).json({ 
+          success: true, 
+          message: "Product updated successfully", 
+          product: updatedProduct 
+        });
+      } catch (innerError) {
+        console.error("Inner update product error:", innerError);
+        return res.status(500).json({ success: false, message: "Server error: " + innerError.message });
       }
-      
-      const updatedProduct = await ProductModel.findByIdAndUpdate(
-        id, 
-        updateData,
-        { new: true, runValidators: true }
-      ).populate('categoryId', 'name')
-       .populate('supplierId', 'name email');
-      
-      return res.status(200).json({ 
-        success: true, 
-        message: "Product updated successfully", 
-        product: updatedProduct 
-      });
     });
   } catch (error) {
     console.error("Update product error:", error);
@@ -296,30 +353,12 @@ const updateProduct = async (req, res) => {
   }
 };
 
-// Add this endpoint to serve images
-const getProductImage = async (req, res) => {
-  try {
-    const { filename } = req.params;
-    const imagePath = path.join(process.cwd(), 'uploads', filename);
-    
-    // Check if file exists
-    if (!fs.existsSync(imagePath)) {
-      return res.status(404).json({ success: false, message: "Image not found" });
-    }
-    
-    // Send file
-    res.sendFile(imagePath);
-  } catch (error) {
-    console.error("Get product image error:", error);
-    return res.status(500).json({ success: false, message: "Server error" });
-  }
-};
 const deleteProduct = async (req, res) => {
   try {
     const { id } = req.params;
     
-    // Check if product exists and user has permission
-    const existingProduct = await ProductModal.findById(id);
+    // Check if product exists
+    const existingProduct = await ProductModel.findById(id);
     if (!existingProduct) {
       return res.status(404).json({ success: false, message: "Product not found"});
     }
@@ -328,9 +367,18 @@ const deleteProduct = async (req, res) => {
     if (req.user.role !== 'admin' && existingProduct.userId.toString() !== req.user._id.toString()) {
       return res.status(403).json({ success: false, message: "Access denied"});
     }
+
+    // Delete image from Cloudinary if exists
+    if (existingProduct.imagePublicId) {
+      try {
+        await deleteFromCloudinary(existingProduct.imagePublicId);
+      } catch (error) {
+        console.error("Error deleting image from Cloudinary:", error);
+      }
+    }
     
     // Soft delete by setting isActive to false
-    const deletedProduct = await ProductModal.findByIdAndUpdate(
+    const deletedProduct = await ProductModel.findByIdAndUpdate(
       id, 
       { isActive: false }, 
       { new: true }
@@ -342,12 +390,13 @@ const deleteProduct = async (req, res) => {
     console.error("Delete product error:", error);
     return res.status(500).json({ success: false, message: "Server error"});
   }
-}
+};
+
 const getProductById = async (req, res) => {
   try {
     const { id } = req.params;
     const product = await ProductModel.findById(id)
-      .populate('categoryId', 'name')
+      .populate('categoryId', 'name categoryName')
       .populate('supplierId', 'name email')
       .populate('userId', 'name email');
     
@@ -369,6 +418,8 @@ const getProductById = async (req, res) => {
 
 export {
   createProduct,
-  deleteProduct, getProductById, getProductImage, getProducts, updateProduct
+  deleteProduct,
+  getProductById,
+  getProducts,
+  updateProduct
 };
-

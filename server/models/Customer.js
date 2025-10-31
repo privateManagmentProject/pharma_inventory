@@ -1,8 +1,9 @@
 import mongoose from "mongoose";
 const LicenseSchema = new mongoose.Schema({
-  name: { type: String},
-  path: { type: String},
-  type: { type: String}
+ name: { type: String },
+  path: { type: String },
+  publicId: { type: String }, // Cloudinary public_id
+  type: { type: String }
 });
 const CustomerSchema = new mongoose.Schema({ 
     name: { type: String},

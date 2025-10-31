@@ -13,12 +13,20 @@ import notificationRoutes from './routes/notification.js';
 import productRoutes from './routes/product.js';
 import SalesOrderRoutes from './routes/salesOrder.js';
 import supplierRoutes from './routes/supplier.js';
+
+// Load environment variables FIRST
 dotenv.config();
+
+console.log('Cloudinary Config Check:', {
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY ? '***' + process.env.CLOUDINARY_API_KEY.slice(-4) : 'missing',
+  has_secret: !!process.env.CLOUDINARY_API_SECRET
+});
+
 const app = express();
 
 app.use(cors());
 app.use(express.json());
-
 
 app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 

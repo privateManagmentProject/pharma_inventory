@@ -59,4 +59,21 @@ const UpdateCategories =async (req, res) =>{
         return res.status(500).json({ success: false, message: "Server error"})
     }
 }
-export { createCategory, getCategories, UpdateCategories };
+const deleteCategory = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const existingCategory = await CategoryModel.findById(id);
+    if (!existingCategory) {
+      return res.status(404).json({ success: false, message: "Category not found" });
+    }
+
+    await CategoryModel.findByIdAndDelete(id);
+    return res.status(200).json({ success: true, message: "Category deleted successfully" });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ success: false, message: "Server error" });
+  }
+};
+export { createCategory, deleteCategory, getCategories, UpdateCategories };
+

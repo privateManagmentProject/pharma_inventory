@@ -1,32 +1,32 @@
 import mongoose from "mongoose";
 
 const ProductSchema = new mongoose.Schema({ 
-    name: { type: String },
-    brandName: { type: String },
+    name: { type: String, default: "" },
+    brandName: { type: String, default: "" },
     brandRate: { 
         type: String, 
         enum: ['good', 'very good', 'excellent'],
         default: 'good'
     },
-    description: { type: String },
-    manufacturer: { type: String},
-    soldPrice: { type: Number }, // Changed to Number
-    purchasePrice: { type: Number }, // Changed to Number
-    expiryDate: { type: Date},
-    stock: { type: Number }, // Changed to Number
+    description: { type: String, default: "" },
+    manufacturer: { type: String, default: "" },
+    soldPrice: { type: Number, default: 0 },
+    purchasePrice: { type: Number, default: 0 },
+    expiryDate: { type: Date, default: Date.now },
+    stock: { type: Number, default: 0 },
     lowStockThreshold: { type: Number, default: 500 },
     outOfStockThreshold: { type: Number, default: 100 },
-
-    image: { type: String },
+    cartonSize: { type: String, default: "" },
+    image: { type: String, default: null },
+    imagePublicId: { type: String, default: null }, // Cloudinary public_id
     packageSize: { 
         type: String, 
-        required: true,
-        enum: ['kg', 'box', 'bottle', 'pack', 'pk','tube','vial', 'ampoule','glass','plastic','syrings','sachet','aerosol','spray','bottle','bag','roll','cops','carton','tin','cans','pouches'] // Match sales order enum
+        default: "kg",
+        enum: ['kg', 'box', 'bottle', 'pack', 'pk','tube','vial', 'ampoule','glass','plastic','syrings','sachet','aerosol','spray','bottle','bag','roll','cops','carton','tin','cans','pouches']
     },
-    cartonSize: { type: String },
-    categoryId: {type: mongoose.Schema.Types.ObjectId, ref: "Category"},
-    supplierId: {type: mongoose.Schema.Types.ObjectId, ref: "Supplier"},
-    userId: {type: mongoose.Schema.Types.ObjectId, ref: "User"},
+    categoryId: { type: mongoose.Schema.Types.ObjectId, ref: "Category", default: null },
+    supplierId: { type: mongoose.Schema.Types.ObjectId, ref: "Supplier", default: null },
+    userId: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
     isActive: { type: Boolean, default: true },
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now }

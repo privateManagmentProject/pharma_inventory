@@ -3,6 +3,7 @@ import mongoose from "mongoose";
 const LicenseSchema = new mongoose.Schema({
   name: { type: String },
   path: { type: String },
+  publicId: { type: String }, // Cloudinary public_id
   type: { type: String }
 });
 
@@ -13,16 +14,15 @@ const AccountSchema = new mongoose.Schema({
 });
 
 const SupplierSchema = new mongoose.Schema({ 
-    name: { type: String},
+    name: { type: String, default: "" },
     email: { 
-        type: String, 
-        default: null, // Use null instead of empty string
-        index: true 
+      type: String,
+      default: "",
     },
-    phone: { type: String},
-    address: { type: String },
+    phone: { type: String, default: "" },
+    address: { type: String, default: "" },
     description: { type: String, default: "" },
-    tinNumber: { type: String },
+    tinNumber: { type: String, default: "" },
     licenses: [LicenseSchema],
     accounts: [AccountSchema],
     userId: {type: mongoose.Schema.Types.ObjectId, ref: "User"},
@@ -31,8 +31,7 @@ const SupplierSchema = new mongoose.Schema({
     updatedAt: { type: Date, default: Date.now }
 });
 
-// Add sparse index to allow multiple null emails
-SupplierSchema.index({ email: 1 }, { sparse: true, unique: true });
+
 
 const SupplierModal = mongoose.model("Supplier", SupplierSchema);
 
