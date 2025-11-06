@@ -112,15 +112,19 @@ const createCustomer = async (req, res) => {
         const { 
           name, 
           email,
-          address, 
+          phone, 
           companyName, 
           tinNumber, 
-          phone, 
           description,
           receiverName,
           receiverPhone,
           receiverAddress,
-          withhold 
+          withhold,
+          withholdPhone,
+          region,
+          zone,
+          woreda,
+          kebele
         } = req.body;
         
         console.log("Request body:", req.body);
@@ -147,10 +151,15 @@ const createCustomer = async (req, res) => {
         const newCustomer = new CustomerModal({
           name: name || "", 
           email: email || "",
-          address: address || "", 
+          phone: phone || "",
+          address: {
+            region: region || "",
+            zone: zone || "",
+            woreda: woreda || "",
+            kebele: kebele || ""
+          },
           companyName: companyName || "",
           tinNumber: tinNumber || "",
-          phone: phone || "",
           description: description || "",
           licenses,
           receiverInfo: {
@@ -159,6 +168,7 @@ const createCustomer = async (req, res) => {
             address: receiverAddress || ""
           },
           withhold: withhold === 'true',
+          withholdPhone: withholdPhone || "",
           userId: req.user._id
         });
         
@@ -188,7 +198,10 @@ const getCustomers = async(req, res) => {
           { email: { $regex: search, $options: 'i' } },
           { companyName: { $regex: search, $options: 'i' } },
           { phone: { $regex: search, $options: 'i' } },
-          { tinNumber: { $regex: search, $options: 'i' } }
+          { tinNumber: { $regex: search, $options: 'i' } },
+          { "address.region": { $regex: search, $options: 'i' } },
+          { "address.zone": { $regex: search, $options: 'i' } },
+          { "address.woreda": { $regex: search, $options: 'i' } }
         ]
       };
     }
@@ -214,15 +227,19 @@ const updateCustomer = async (req, res) => {
         const { 
           name, 
           email,
-          address, 
+          phone, 
           companyName, 
           tinNumber, 
-          phone, 
           description,
           receiverName,
           receiverPhone,
           receiverAddress,
           withhold,
+          withholdPhone,
+          region,
+          zone,
+          woreda,
+          kebele,
           licensesToDelete 
         } = req.body;
         
@@ -277,10 +294,15 @@ const updateCustomer = async (req, res) => {
           {
             name: name || "",
             email: email || "",
-            address: address || "",
+            phone: phone || "",
+            address: {
+              region: region || "",
+              zone: zone || "",
+              woreda: woreda || "",
+              kebele: kebele || ""
+            },
             companyName: companyName || "",
             tinNumber: tinNumber || "",
-            phone: phone || "",
             description: description || "",
             licenses: allLicenses,
             receiverInfo: {
@@ -289,6 +311,7 @@ const updateCustomer = async (req, res) => {
               address: receiverAddress || ""
             },
             withhold: withhold === 'true',
+            withholdPhone: withholdPhone || "",
             updatedAt: new Date()
           },
           { new: true }

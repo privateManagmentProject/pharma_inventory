@@ -189,12 +189,12 @@ const createProduct = async (req, res) => {
   }
 };
 
-const getProducts = async(req, res) => {
+const getProducts = async (req, res) => {
   try {
     const { 
       search, 
-      category, 
-      supplier, 
+      categoryName, 
+      supplierName, 
       minPrice, 
       maxPrice, 
       minStock, 
@@ -213,7 +213,7 @@ const getProducts = async(req, res) => {
     let filter = { isActive: true };
     
     // Enhanced search to include brand and manufacturer
-    if(search){
+    if (search) {
       filter.$or = [
         { name: { $regex: search, $options: 'i' } },
         { brandName: { $regex: search, $options: 'i' } },
@@ -222,32 +222,38 @@ const getProducts = async(req, res) => {
       ];
     }
     
-    if(category) filter.categoryId = category;
-    if(supplier) filter.supplierId = supplier;
-    if(packageSize) filter.packageSize = packageSize;
-    if(manufacturer) filter.manufacturer = { $regex: manufacturer, $options: 'i' };
-    if(brandRate) filter.brandRate = brandRate;
+    if (packageSize) filter.packageSize = packageSize;
+    if (manufacturer) filter.manufacturer = { $regex: manufacturer, $options: 'i' };
+    if (brandRate) filter.brandRate = brandRate;
     
     // Price range filters
-    if(minPrice || maxPrice){
+    if (minPrice || maxPrice) {
       filter.soldPrice = {};
-      if(minPrice) filter.soldPrice.$gte = parseFloat(minPrice);
-      if(maxPrice) filter.soldPrice.$lte = parseFloat(maxPrice);
+      if (minPrice) filter.soldPrice.$gte = parseFloat(minPrice);
+      if (maxPrice) filter.soldPrice.$lte = parseFloat(maxPrice);
     }
     
     // Stock range filters
-    if(minStock || maxStock){
+    if (minStock || maxStock) {
       filter.stock = {};
-      if(minStock) filter.stock.$gte = parseInt(minStock);
-      if(maxStock) filter.stock.$lte = parseInt(maxStock);
+      if (minStock) filter.stock.$gte = parseInt(minStock);
+      if (maxStock) filter.stock.$lte = parseInt(maxStock);
     }
     
     // Expiry date filters
-    if(expiryDateFrom || expiryDateTo){
+    if (expiryDateFrom || expiryDateTo) {
       filter.expiryDate = {};
-      if(expiryDateFrom) filter.expiryDate.$gte = new Date(expiryDateFrom);
-      if(expiryDateTo) filter.expiryDate.$lte = new Date(expiryDateTo);
+      if (expiryDateFrom) filter.expiryDate.$gte = new Date(expiryDateFrom);
+      if (expiryDateTo) filter.expiryDate.$lte = new Date(expiryDateTo);
     }
+
+    // Lookup for categoryName and supplierName
+    const categoryMatch = categoryName
+      ? { name: { $regex: categoryName, $options: 'i' } }
+      : {};
+    const supplierMatch = supplierName
+      ? { name: { $regex: supplierName, $options: 'i' } }
+      : {};
 
     // Sorting
     const sortOptions = {};
@@ -256,15 +262,68 @@ const getProducts = async(req, res) => {
     // Pagination
     const skip = (parseInt(page) - 1) * parseInt(limit);
 
-    const products = await ProductModel.find(filter)
-      .populate('categoryId', 'categoryName')
-      .populate('supplierId', 'name')
-      .sort(sortOptions)
-      .skip(skip)
-      .limit(parseInt(limit));
-    
+    // Aggregate query to filter by categoryName and supplierName
+    const products = await ProductModel.aggregate([
+      {
+        $match: filter,
+      },
+      {
+        $lookup: {
+          from: "categories",
+          localField: "categoryId",
+          foreignField: "_id",
+          as: "category",
+        },
+      },
+      {
+        $lookup: {
+          from: "suppliers",
+          localField: "supplierId",
+          foreignField: "_id",
+          as: "supplier",
+        },
+      },
+      {
+        $match: {
+          ...(categoryName && { "category.name": { $regex: categoryName, $options: "i" } }),
+          ...(supplierName && { "supplier.name": { $regex: supplierName, $options: "i" } }),
+        },
+      },
+      {
+        $sort: sortOptions,
+      },
+      {
+        $skip: skip,
+      },
+      {
+        $limit: parseInt(limit),
+      },
+      {
+        $project: {
+          name: 1,
+          brandName: 1,
+          brandRate: 1,
+          description: 1,
+          manufacturer: 1,
+          soldPrice: 1,
+          purchasePrice: 1,
+          expiryDate: 1,
+          stock: 1,
+          packageSize: 1,
+          cartonSize: 1,
+          categoryId: 1,
+          supplierId: 1,
+          isActive: 1,
+          createdAt: 1,
+          updatedAt: 1,
+          category: { $arrayElemAt: ["$category", 0] },
+          supplier: { $arrayElemAt: ["$supplier", 0] },
+        },
+      },
+    ]);
+
     const total = await ProductModel.countDocuments(filter);
-    
+
     return res.status(200).json({ 
       success: true, 
       products, 

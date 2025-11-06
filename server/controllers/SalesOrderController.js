@@ -1,20 +1,94 @@
+import fs from "fs";
+import multer from "multer";
+import path from "path";
 import CustomerModal from "../models/Customer.js";
 import ProductModal from "../models/Product.js";
 import SalesOrderModal from "../models/SalesOrder.js";
+
+// Multer configuration for payment slips and license files
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    let uploadDir = 'uploads/';
+    if (file.fieldname === 'paymentSlips') {
+      uploadDir += 'payment-slips/';
+    } else if (file.fieldname === 'licenseFiles') {
+      uploadDir += 'licenses/';
+    }
+    
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
+    }
+    cb(null, uploadDir);
+  },
+  filename: function (req, file, cb) {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, uniqueSuffix + path.extname(file.originalname));
+  }
+});
+
+const upload = multer({ 
+  storage: storage,
+  fileFilter: function (req, file, cb) {
+    if (file.mimetype.startsWith('image/') || file.mimetype === 'application/pdf') {
+      cb(null, true);
+    } else {
+      cb(new Error('Only image and PDF files are allowed!'), false);
+    }
+  },
+  limits: {
+    fileSize: 10 * 1024 * 1024, // 10MB limit
+  }
+}).fields([
+  { name: 'paymentSlips', maxCount: 5 },
+  { name: 'licenseFiles', maxCount: 5 }
+]);
+
+// Helper function to upload to Cloudinary
+const uploadToCloudinary = async (filePath, folder = "sales-order") => {
+  try {
+    const { v2: cloudinary } = await import('cloudinary');
+    
+    cloudinary.config({
+      cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+      api_key: process.env.CLOUDINARY_API_KEY,
+      api_secret: process.env.CLOUDINARY_API_SECRET,
+    });
+    
+    const result = await cloudinary.uploader.upload(filePath, {
+      folder: folder,
+      resource_type: "auto",
+      use_filename: true,
+      unique_filename: true
+    });
+    
+    // Delete local file after upload
+    if (fs.existsSync(filePath)) {
+      fs.unlinkSync(filePath);
+    }
+    
+    return {
+      path: result.secure_url,
+      publicId: result.public_id,
+      name: path.basename(filePath),
+      type: result.resource_type === 'image' ? `image/${result.format}` : 'application/pdf',
+      uploadedAt: new Date()
+    };
+  } catch (error) {
+    if (fs.existsSync(filePath)) {
+      fs.unlinkSync(filePath);
+    }
+    throw new Error(`Failed to upload file to Cloudinary: ${error.message}`);
+  }
+};
 
 const getSalesOrders = async (req, res) => {
     try {
         const { 
             status, 
-            customerName, 
-            productName, 
-            paymentStatus,
-            paymentType,
-            dateFrom,
-            dateTo,
-            minAmount,
-            maxAmount,
-            search, // General search term
+            region,
+            zone,
+            paymentMethod,
+            search,
             sortBy = 'createdAt',
             sortOrder = 'desc',
             page = 1,
@@ -23,42 +97,33 @@ const getSalesOrders = async (req, res) => {
         
         let filter = {};
         
-        // General search across multiple fields
-        if (search) {
-            const searchRegex = { $regex: search, $options: 'i' };
-            filter.$or = [
-                { customerName: searchRegex },
-                { 'items.productName': searchRegex },
-                { 'items.supplierName': searchRegex },
-                { customerTin: searchRegex }
-            ];
-        }
-        
-        // Specific field filters
+        // Status filter
         if (status) filter.status = status;
-        if (customerName) filter.customerName = { $regex: customerName, $options: 'i' };
-        if (productName) {
-            filter['items.productName'] = { $regex: productName, $options: 'i' };
-        }
-        if (paymentStatus) {
-            filter['paymentInfo.status'] = paymentStatus;
-        }
-        if (paymentType) {
-            filter['paymentInfo.paymentType'] = paymentType;
+        
+        // Address filters
+        if (region) {
+          filter['customerAddress.region'] = { $regex: region, $options: 'i' };
         }
         
-        // Date range filters
-        if (dateFrom || dateTo) {
-            filter.createdAt = {};
-            if (dateFrom) filter.createdAt.$gte = new Date(dateFrom);
-            if (dateTo) filter.createdAt.$lte = new Date(dateTo);
+        if (zone) {
+          filter['customerAddress.zone'] = { $regex: zone, $options: 'i' };
         }
         
-        // Amount range filters
-        if (minAmount || maxAmount) {
-            filter.totalAmount = {};
-            if (minAmount) filter.totalAmount.$gte = parseFloat(minAmount);
-            if (maxAmount) filter.totalAmount.$lte = parseFloat(maxAmount);
+        // Payment method filter
+        if (paymentMethod) {
+          filter['paymentInfo.paymentMethod'] = paymentMethod;
+        }
+        
+        // General search
+        if (search) {
+          const searchRegex = { $regex: search, $options: 'i' };
+          filter.$or = [
+            { customerName: searchRegex },
+            { companyName: searchRegex },
+            { customerTin: searchRegex },
+            { 'items.productName': searchRegex },
+            { 'items.supplierName': searchRegex }
+          ];
         }
 
         // Sorting
@@ -69,9 +134,9 @@ const getSalesOrders = async (req, res) => {
         const skip = (parseInt(page) - 1) * parseInt(limit);
 
         const salesOrders = await SalesOrderModal.find(filter)
-            .populate('customerId', 'name companyName phone')
-            .populate('items.productId', 'name brandName')
-            .populate('items.supplierId', 'name')
+            .populate('customerId', 'name companyName phone address withhold withholdPhone receiverInfo tinNumber licenses')
+            .populate('items.productId', 'name brandName categoryId stock soldPrice purchasePrice')
+            .populate('items.supplierId', 'name accounts')
             .sort(sortOptions)
             .skip(skip)
             .limit(parseInt(limit));
@@ -94,252 +159,11 @@ const getSalesOrders = async (req, res) => {
     }
 };
 
-const addPayment = async (req, res) => {
-    try {
-        const { id } = req.params;
-        const { amount, paymentDate, notes } = req.body;
-
-        const salesOrder = await SalesOrderModal.findById(id);
-        if (!salesOrder) {
-            return res.status(404).json({ success: false, message: "Sales order not found" });
-        }
-
-        const paymentAmount = parseFloat(amount);
-        const totalAmount = salesOrder.totalAmount;
-        const currentPaidAmount = salesOrder.paidAmount || 0;
-        const newPaidAmount = currentPaidAmount + paymentAmount;
-
-        // Update payment info based on payment type
-        if (salesOrder.paymentInfo && salesOrder.paymentInfo.paymentType === 'date-based') {
-            // Find the next unpaid scheduled payment
-            const unpaidSchedule = salesOrder.paymentInfo.paymentSchedule.find(
-                schedule => schedule.status === 'pending'
-            );
-            
-            if (unpaidSchedule) {
-                unpaidSchedule.status = 'paid';
-                unpaidSchedule.paidDate = paymentDate || new Date();
-            }
-        }
-
-        // Update sales order
-        salesOrder.paidAmount = newPaidAmount;
-        
-        // Ensure paymentInfo exists before updating
-        if (!salesOrder.paymentInfo) {
-            salesOrder.paymentInfo = {
-                paymentType: 'one-time',
-                status: 'pending',
-                totalPaidAmount: 0,
-                remainingAmount: totalAmount
-            };
-        }
-        
-        salesOrder.paymentInfo.totalPaidAmount = newPaidAmount;
-        salesOrder.paymentInfo.remainingAmount = totalAmount - newPaidAmount;
-
-        // Update status based on payment
-        if (newPaidAmount >= totalAmount) {
-            salesOrder.paymentInfo.status = 'completed';
-            salesOrder.status = 'completed';
-        } else if (newPaidAmount > 0) {
-            salesOrder.paymentInfo.status = 'partial';
-            salesOrder.status = 'payment_progress';
-        }
-
-        // Check if overdue
-        const today = new Date();
-        if (salesOrder.paymentInfo.paymentType === 'one-time' && salesOrder.paymentInfo.dueDate) {
-            const dueDate = new Date(salesOrder.paymentInfo.dueDate);
-            if (salesOrder.paymentInfo.status !== 'completed' && today > dueDate) {
-                salesOrder.paymentInfo.status = 'overdue';
-            }
-        } else if (salesOrder.paymentInfo.paymentType === 'two-time' && salesOrder.paymentInfo.secondPaymentDate) {
-            const firstDue = new Date(salesOrder.paymentInfo.dueDate);
-            const secondDue = new Date(salesOrder.paymentInfo.secondPaymentDate);
-            if (salesOrder.paymentInfo.status !== 'completed' && (today > firstDue || today > secondDue)) {
-                salesOrder.paymentInfo.status = 'overdue';
-            }
-        }
-
-        await salesOrder.save();
-
-        return res.status(200).json({
-            success: true,
-            message: "Payment added successfully",
-            salesOrder
-        });
-
-    } catch (error) {
-        console.error("Add payment error:", error);
-        return res.status(500).json({ success: false, message: "Server error" });
-    }
-};
-
-const getPaymentSchedule = async (req, res) => {
-    try {
-        const { id } = req.params;
-
-        const salesOrder = await SalesOrderModal.findById(id);
-        if (!salesOrder) {
-            return res.status(404).json({ success: false, message: "Sales order not found" });
-        }
-
-        const paymentSchedule = salesOrder.paymentInfo?.paymentSchedule || [];
-        const totalAmount = salesOrder.totalAmount;
-        const paidAmount = salesOrder.paidAmount || 0;
-
-        return res.status(200).json({
-            success: true,
-            paymentSchedule,
-            totalAmount,
-            paidAmount,
-            remainingAmount: totalAmount - paidAmount,
-            paymentType: salesOrder.paymentInfo?.paymentType || 'one-time'
-        });
-
-    } catch (error) {
-        console.error("Get payment schedule error:", error);
-        return res.status(500).json({ success: false, message: "Server error" });
-    }
-};
-
-const updateSalesOrder = async (req, res) => {
-    try {
-        const { id } = req.params;
-        const { paidAmount, status, ...otherFields } = req.body;
-
-        const salesOrder = await SalesOrderModal.findById(id);
-        if (!salesOrder) {
-            return res.status(404).json({ success: false, message: "Sales order not found" });
-        }
-
-        // Store old status for stock adjustment logic
-        const oldStatus = salesOrder.status;
-        
-        // Update paid amount if provided
-        if (paidAmount !== undefined) {
-            const additionalAmount = parseFloat(paidAmount);
-            salesOrder.paidAmount += additionalAmount;
-            
-            // Auto-update status based on payment
-            const totalAmount = salesOrder.totalAmount;
-            if (salesOrder.paidAmount >= totalAmount) {
-                salesOrder.status = 'completed';
-                if (salesOrder.paymentInfo) {
-                    salesOrder.paymentInfo.status = 'completed';
-                }
-            } else if (salesOrder.paidAmount > 0) {
-                salesOrder.status = 'payment_progress';
-                if (salesOrder.paymentInfo) {
-                    salesOrder.paymentInfo.status = 'partial';
-                }
-            } else {
-                salesOrder.status = 'order_created';
-                if (salesOrder.paymentInfo) {
-                    salesOrder.paymentInfo.status = 'pending';
-                }
-            }
-            
-            // Check if overdue
-            const today = new Date();
-            if (salesOrder.paymentInfo && salesOrder.paymentInfo.dueDate) {
-                const dueDate = new Date(salesOrder.paymentInfo.dueDate);
-                if (salesOrder.paymentInfo.status !== 'completed' && today > dueDate) {
-                    salesOrder.paymentInfo.status = 'overdue';
-                }
-            }
-        }
-
-        // Manual status override if provided
-        if (status) {
-            salesOrder.status = status;
-            
-            // If manually completed, set paid amount to full price
-            if (status === 'completed') {
-                salesOrder.paidAmount = salesOrder.totalAmount;
-                if (salesOrder.paymentInfo) {
-                    salesOrder.paymentInfo.status = 'completed';
-                }
-            }
-        }
-
-        // Update other fields if any
-        Object.keys(otherFields).forEach(key => {
-            if (salesOrder[key] !== undefined) {
-                salesOrder[key] = otherFields[key];
-            }
-        });
-
-        await salesOrder.save();
-
-        // Handle stock changes for multiple items
-        if ((salesOrder.status === 'completed') && 
-            (oldStatus !== 'completed')) {
-            // Reduce stock for all items when order is completed
-            for (const item of salesOrder.items) {
-                const product = await ProductModal.findById(item.productId);
-                if (product) {
-                    product.stock = product.stock - item.quantity;
-                    await product.save();
-                }
-            }
-        } else if ((oldStatus === 'completed') && 
-                   (salesOrder.status !== 'completed')) {
-            // Restock all items if order is no longer completed
-            for (const item of salesOrder.items) {
-                const product = await ProductModal.findById(item.productId);
-                if (product) {
-                    product.stock = product.stock + item.quantity;
-                    await product.save();
-                }
-            }
-        }
-
-        return res.status(200).json({ 
-            success: true, 
-            message: "Sales order updated successfully",
-            salesOrder 
-        });
-
-    } catch (error) {
-        console.error("Update sales order error:", error);
-        return res.status(500).json({ success: false, message: "Server error" });
-    }
-};
-
-const getSalesOrderById = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const salesOrder = await SalesOrderModal.findById(id)
-      .populate('customerId')
-      .populate({
-        path: 'items.productId',
-        populate: {
-          path: 'categoryId',
-          model: 'Category'
-        }
-      })
-      .populate('items.supplierId');
-    
-    if (!salesOrder) {
-      return res.status(404).json({ success: false, message: "Sales order not found" });
-    }
-    
-    return res.status(200).json({ success: true, salesOrder });
-  } catch (error) {
-    console.error("Error fetching sales order:", error);
-    return res.status(500).json({ success: false, message: "Server error" });
-  }
-};
-
 const createSalesOrder = async (req, res) => {
   try {
     const { 
       customerId, 
-      items, 
-      paymentInfo,
-      notes 
+      items
     } = req.body;
 
     // Validate customer and get additional info
@@ -368,7 +192,6 @@ const createSalesOrder = async (req, res) => {
         });
       }
       
-      // Use soldPrice for unitPrice and purchasePrice for supplierPrice
       const unitPrice = product.soldPrice;
       const supplierPrice = product.purchasePrice;
       const itemTotal = unitPrice * parseInt(item.quantity);
@@ -388,47 +211,218 @@ const createSalesOrder = async (req, res) => {
       });
     }
 
-    // Process payment info
-    let processedPaymentInfo = {
-      paymentType: paymentInfo.paymentType || 'one-time',
-      dueDate: paymentInfo.dueDate,
-      status: 'pending',
-      totalPaidAmount: 0,
-      remainingAmount: totalAmount
-    };
-
-    if (paymentInfo.paymentType === 'two-time') {
-      processedPaymentInfo.secondPaymentDate = paymentInfo.secondPaymentDate;
-    } else if (paymentInfo.paymentType === 'date-based') {
-      processedPaymentInfo.paymentSchedule = paymentInfo.paymentSchedule || [];
-    }
-
-    // Create sales order with customer details
+    // Create sales order with pre_order status
     const newSalesOrder = new SalesOrderModal({
       customerId,
       customerName: customer.name,
       customerTin: customer.tinNumber,
       customerAddress: customer.address,
-      customerLicense: customer.licenseNumber,
+      customerLicense: customer.licenses.length > 0 ? customer.licenses[0].path : '',
+      companyName: customer.companyName,
+      withhold: customer.withhold,
+      withholdPhone: customer.withholdPhone,
+      receiverName: customer.receiverInfo?.name || '',
+      receiverPhone: customer.receiverInfo?.phone || '',
+      receiverAddress: customer.receiverInfo?.address || '',
       items: orderItems,
       totalAmount: totalAmount,
-      paymentInfo: processedPaymentInfo,
-      status: 'order_created',
+      paymentInfo: {
+        paymentMethod: 'cash', // Default, will be updated later
+        status: 'pending',
+        totalPaidAmount: 0,
+        remainingAmount: totalAmount
+      },
+      status: 'pre_order',
       paidAmount: 0,
       unpaidAmount: totalAmount,
-      notes: notes || ''
+      step: 1
     });
 
     await newSalesOrder.save();
     
     return res.status(201).json({ 
       success: true, 
-      message: "Sales order created successfully", 
+      message: "Pre-order created successfully", 
       salesOrder: newSalesOrder 
     });
 
   } catch (error) {
     console.error("Error creating sales order:", error);
+    return res.status(500).json({ success: false, message: "Server error" });
+  }
+};
+
+const updateSalesOrderStatus = async (req, res) => {
+  try {
+    upload(req, res, async function (err) {
+      if (err) {
+        console.error("Upload error:", err);
+        return res.status(400).json({ success: false, message: err.message });
+      }
+
+      try {
+        const { id } = req.params;
+        const { 
+          status, 
+          paymentMethod, 
+          paidAmount, 
+          dueDate,
+          withholdPhone,
+          cancellationReason,
+          notes 
+        } = req.body;
+
+        const salesOrder = await SalesOrderModal.findById(id);
+        if (!salesOrder) {
+          return res.status(404).json({ success: false, message: "Sales order not found" });
+        }
+
+        const oldStatus = salesOrder.status;
+        
+        // Upload payment slips if any
+        const paymentSlips = [];
+        if (req.files && req.files.paymentSlips) {
+          for (const file of req.files.paymentSlips) {
+            try {
+              const cloudinaryResult = await uploadToCloudinary(file.path, 'payment-slips');
+              paymentSlips.push(cloudinaryResult);
+            } catch (uploadError) {
+              console.error("Cloudinary upload error for payment slip:", file.originalname, uploadError);
+            }
+          }
+        }
+
+        // Upload license files if any
+        const licenseFiles = [];
+        if (req.files && req.files.licenseFiles) {
+          for (const file of req.files.licenseFiles) {
+            try {
+              const cloudinaryResult = await uploadToCloudinary(file.path, 'licenses');
+              licenseFiles.push(cloudinaryResult);
+            } catch (uploadError) {
+              console.error("Cloudinary upload error for license file:", file.originalname, uploadError);
+            }
+          }
+        }
+
+        // Update payment info
+        if (paymentMethod) {
+          salesOrder.paymentInfo.paymentMethod = paymentMethod;
+        }
+        
+        if (paidAmount !== undefined) {
+          const additionalAmount = parseFloat(paidAmount);
+          salesOrder.paidAmount += additionalAmount;
+          salesOrder.paymentInfo.totalPaidAmount += additionalAmount;
+        }
+
+        if (dueDate) {
+          salesOrder.paymentInfo.dueDate = new Date(dueDate);
+        }
+
+        // Add new payment slips
+        if (paymentSlips.length > 0) {
+          salesOrder.paymentInfo.paymentSlips = [...salesOrder.paymentInfo.paymentSlips, ...paymentSlips];
+        }
+
+        // Add new license files
+        if (licenseFiles.length > 0) {
+          salesOrder.licenseFiles = [...salesOrder.licenseFiles, ...licenseFiles];
+        }
+
+        // Update status and step
+        if (status) {
+          salesOrder.status = status;
+          
+          // Update step based on status
+          if (status === 'pre_order') {
+            salesOrder.step = 1;
+          } else if (['sales_order_started', 'payment_progress', 'payment_completed', 'credit'].includes(status)) {
+            salesOrder.step = 2;
+          } else if (status === 'supplier_checked') {
+            salesOrder.step = 3;
+          } else if (status === 'cancelled_payment') {
+            salesOrder.step = 0;
+          }
+        }
+
+        // Update withhold phone
+        if (withholdPhone !== undefined) {
+          salesOrder.withholdPhone = withholdPhone;
+        }
+
+        // Update cancellation reason
+        if (cancellationReason) {
+          salesOrder.cancellationReason = cancellationReason;
+        }
+
+        // Update notes
+        if (notes !== undefined) {
+          salesOrder.notes = notes;
+        }
+
+        // Handle stock changes when moving to sales_order_started
+        if (status === 'sales_order_started' && oldStatus === 'pre_order') {
+          for (const item of salesOrder.items) {
+            const product = await ProductModal.findById(item.productId);
+            if (product) {
+              product.stock = product.stock - item.quantity;
+              await product.save();
+            }
+          }
+        }
+
+        // Restock if moving back from sales_order_started or cancelling
+        if ((oldStatus === 'sales_order_started' && status !== 'sales_order_started') || 
+            status === 'cancelled_payment') {
+          for (const item of salesOrder.items) {
+            const product = await ProductModal.findById(item.productId);
+            if (product) {
+              product.stock = product.stock + item.quantity;
+              await product.save();
+            }
+          }
+        }
+
+        await salesOrder.save();
+
+        return res.status(200).json({ 
+          success: true, 
+          message: "Sales order updated successfully",
+          salesOrder 
+        });
+      } catch (innerError) {
+        console.error("Inner update error:", innerError);
+        return res.status(500).json({ success: false, message: "Server error: " + innerError.message });
+      }
+    });
+  } catch (error) {
+    console.error("Update sales order error:", error);
+    return res.status(500).json({ success: false, message: "Server error" });
+  }
+};
+
+const getSalesOrderById = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const salesOrder = await SalesOrderModal.findById(id)
+      .populate('customerId')
+      .populate({
+        path: 'items.productId',
+        populate: {
+          path: 'categoryId',
+          model: 'Category'
+        }
+      })
+      .populate('items.supplierId');
+    
+    if (!salesOrder) {
+      return res.status(404).json({ success: false, message: "Sales order not found" });
+    }
+    
+    return res.status(200).json({ success: true, salesOrder });
+  } catch (error) {
+    console.error("Error fetching sales order:", error);
     return res.status(500).json({ success: false, message: "Server error" });
   }
 };
@@ -453,10 +447,17 @@ const generateSalesOrderPDF = async (req, res) => {
       return res.status(404).json({ success: false, message: "Sales order not found" });
     }
 
-    // Return data for PDF generation
+    // Enhanced PDF data with all customer information
+    const pdfData = {
+      salesOrder: {
+        ...salesOrder.toObject(),
+        customerFullInfo: salesOrder.customerId
+      }
+    };
+
     return res.status(200).json({
       success: true,
-      salesOrder,
+      ...pdfData,
       pdfType: type
     });
 
@@ -466,60 +467,6 @@ const generateSalesOrderPDF = async (req, res) => {
   }
 };
 
-const updateSalesOrderStatus = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { status } = req.body;
-
-    const salesOrder = await SalesOrderModal.findById(id);
-    if (!salesOrder) {
-      return res.status(404).json({ success: false, message: "Sales order not found" });
-    }
-
-    const oldStatus = salesOrder.status;
-    salesOrder.status = status;
-
-    // Handle stock changes only when order progresses to completed
-    if (status === 'completed' && oldStatus !== 'completed') {
-      for (const item of salesOrder.items) {
-        const product = await ProductModal.findById(item.productId);
-        if (!product) {
-          return res.status(404).json({ success: false, message: "Product not found" });
-        }
-
-        // Update stock
-        product.stock = product.stock - item.quantity;
-        await product.save();
-      }
-    }
-
-    // If moving back from completed, restock
-    if (oldStatus === 'completed' && status !== 'completed') {
-      for (const item of salesOrder.items) {
-        const product = await ProductModal.findById(item.productId);
-        if (product) {
-          product.stock = product.stock + item.quantity;
-          await product.save();
-        }
-      }
-    }
-
-    await salesOrder.save();
-
-    return res.status(200).json({ 
-      success: true, 
-      message: "Sales order status updated successfully" 
-    });
-
-  } catch (error) {
-    return res.status(500).json({ success: false, message: "Server error" });
-  }
-};
-
 export {
-    addPayment, createSalesOrder, generateSalesOrderPDF, getPaymentSchedule, getSalesOrderById,
-    getSalesOrders,
-    updateSalesOrder,
-    updateSalesOrderStatus
+  createSalesOrder, generateSalesOrderPDF, getSalesOrderById, getSalesOrders, updateSalesOrderStatus
 };
-
