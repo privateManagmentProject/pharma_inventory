@@ -207,7 +207,9 @@ const getProducts = async (req, res) => {
       sortBy = 'createdAt', 
       sortOrder = 'desc', 
       page = 1, 
-      limit = 10 
+      limit = 10,
+      // Add a new parameter to get all products
+      all = false
     } = req.query;
     
     let filter = { isActive: true };
@@ -259,10 +261,71 @@ const getProducts = async (req, res) => {
     const sortOptions = {};
     sortOptions[sortBy] = sortOrder === 'desc' ? -1 : 1;
 
-    // Pagination
+    // If all=true, return all products without pagination
+    if (all === 'true') {
+      const products = await ProductModel.aggregate([
+        {
+          $match: filter,
+        },
+        {
+          $lookup: {
+            from: "categories",
+            localField: "categoryId",
+            foreignField: "_id",
+            as: "category",
+          },
+        },
+        {
+          $lookup: {
+            from: "suppliers",
+            localField: "supplierId",
+            foreignField: "_id",
+            as: "supplier",
+          },
+        },
+        {
+          $match: {
+            ...(categoryName && { "category.name": { $regex: categoryName, $options: "i" } }),
+            ...(supplierName && { "supplier.name": { $regex: supplierName, $options: "i" } }),
+          },
+        },
+        {
+          $sort: sortOptions,
+        },
+        {
+          $project: {
+            name: 1,
+            brandName: 1,
+            brandRate: 1,
+            description: 1,
+            manufacturer: 1,
+            soldPrice: 1,
+            purchasePrice: 1,
+            expiryDate: 1,
+            stock: 1,
+            packageSize: 1,
+            cartonSize: 1,
+            categoryId: 1,
+            supplierId: 1,
+            isActive: 1,
+            createdAt: 1,
+            updatedAt: 1,
+            category: { $arrayElemAt: ["$category", 0] },
+            supplier: { $arrayElemAt: ["$supplier", 0] },
+          },
+        },
+      ]);
+
+      return res.status(200).json({ 
+        success: true, 
+        products, 
+        total: products.length
+      });
+    }
+
+    // Original pagination logic for normal requests
     const skip = (parseInt(page) - 1) * parseInt(limit);
 
-    // Aggregate query to filter by categoryName and supplierName
     const products = await ProductModel.aggregate([
       {
         $match: filter,
